@@ -2,7 +2,7 @@
 
 Collects cybersecurity news from Krebs on Security, The Hacker News, BleepingComputer and SecurityWeek, extracts CVE identifiers, stores everything in SQLite, and shows it on a local dashboard. It can alert you by Slack, email or webhook.
 
-![secnews dashboard overview: Today, Threats, CVE page, Watchlist and alerts, System and the weekly briefing](docs/screenshots/overview.png)
+![secnews Today page: critical CVEs reported as exploited, each with its official NVD score and source count](docs/screenshots/today.png)
 
 ## Main features
 
@@ -17,8 +17,8 @@ Collects cybersecurity news from Krebs on Security, The Hacker News, BleepingCom
 | **System** | Source health, a run log and settings, so you can tell whether to trust what the other pages show. |
 | **Polite and local** | Checks robots.txt, rate limits requests, keeps secrets in environment variables and binds to `127.0.0.1` only. |
 
-### Today
-![Today page with summary counts, a weekly CVE chart and critical exploited CVEs](docs/screenshots/today.png)
+### All pages at a glance
+![secnews dashboard overview: Today, Threats, CVE page, Watchlist and alerts, System and the weekly briefing](docs/screenshots/overview.png)
 
 ### Threats
 ![Threats page with search, state and severity filters](docs/screenshots/threats.png)
