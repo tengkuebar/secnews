@@ -2,6 +2,41 @@
 
 Collects cybersecurity news from Krebs on Security, The Hacker News, BleepingComputer and SecurityWeek, extracts CVE identifiers, stores everything in SQLite, and shows it on a local dashboard. It can alert you by Slack, email or webhook.
 
+![secnews dashboard overview: Today, Threats, CVE page, Watchlist and alerts, System and the weekly briefing](docs/screenshots/overview.png)
+
+## Main features
+
+| Feature | What it gives you |
+|---|---|
+| **Today** | A short list of what needs a decision: CVEs that match your watchlist, then critical ones reported as exploited. Mark Reviewed or snooze. |
+| **Threats** | Every CVE from the last 30 days, one row each, with state tabs, severity chips and search. |
+| **Official scores** | The NIST NVD score replaces the one an article quotes. A CVE with no score is marked Unrated, never guessed. |
+| **One CVE, many sources** | The same CVE from different sites is merged. The CVE page shows each source's score and flags disagreement. |
+| **Watchlist and alerts** | List the products you run. Alert rules send to Slack, email or a webhook, once per CVE. |
+| **Weekly briefing** | A one-page summary written only from stored data: the CVE to act on, new CVEs, exploited ones and where sources disagree. |
+| **System** | Source health, a run log and settings, so you can tell whether to trust what the other pages show. |
+| **Polite and local** | Checks robots.txt, rate limits requests, keeps secrets in environment variables and binds to `127.0.0.1` only. |
+
+### Today
+![Today page with summary counts, a weekly CVE chart and critical exploited CVEs](docs/screenshots/today.png)
+
+### Threats
+![Threats page with search, state and severity filters](docs/screenshots/threats.png)
+
+### One CVE, every source
+![CVE page showing the official NVD score, each source's report and the decision panel](docs/screenshots/cve.png)
+
+### Watchlist and alerts
+![Watchlist, alert rules and alert channels](docs/screenshots/watchlist.png)
+
+### Weekly briefing
+![Weekly briefing with the one CVE to act on and the week's numbers](docs/screenshots/briefing.png)
+
+### System
+![System page with source health and recent runs per source](docs/screenshots/system.png)
+
+Screenshots show live data from one instance. The headlines come from public security news sites.
+
 ## Setup (Windows)
 
 ```powershell
