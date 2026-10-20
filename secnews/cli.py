@@ -47,6 +47,20 @@ def cmd_reindex(cfg, a):
     print(f"CVE rows rebuilt from stored articles: {r['before']} before, {r['after']} after")
 
 
+def cmd_nvd(cfg, a):
+    from . import nvd
+    if not nvd.settings(cfg)["enabled"]:
+        print("NVD scores are switched off. Set nvd: enabled: true in config.yaml.")
+        return 1
+    conn = db.init_db(cfg["database"])
+    waiting = len(nvd.pending(conn))
+    n = a.limit or (waiting if a.all else None)
+    print(f"{waiting} CVEs waiting for an official score; asking about {n or nvd.settings(cfg)['max_per_run']}.")
+    r = nvd.enrich(conn, cfg, limit=n)
+    print(f"Asked NVD about {r['asked']}, {r['scored']} had a score." + (f" Stopped: {r['error']}" if r["error"] else ""))
+    return 1 if r["error"] else 0
+
+
 def cmd_scrape(cfg, a):
     res = run_cycle(cfg, only=a.source)
     if "skipped" in res:
@@ -81,6 +95,8 @@ def cmd_cve(cfg, a):
         print("Not found")
         return 1
     print(f"{d['cve_id']}  {d['severity']}  CVSS {d['cvss']}  (from {d['score_source']})")
+    if d["nvd"]:
+        print(f"NVD: {d['nvd']['cvss']} (CVSS v{d['nvd']['version']}, {d['nvd']['status']}) {d['nvd']['vector'] or ''}")
     if d["conflict"]:
         print("Sources disagree on the score: " + " vs ".join(str(x) for x in d["conflict"]))
     print(f"First seen {d['first_seen']}; {d['article_count']} articles, {d['source_count']} sources; "
@@ -131,6 +147,10 @@ def build_parser():
     s = sub.add_parser("scrape", help="scrape sources now, then run alert rules")
     s.add_argument("--source")
     s.set_defaults(fn=cmd_scrape)
+    s = sub.add_parser("nvd", help="fetch official NVD scores for recent CVEs now")
+    s.add_argument("--limit", type=int, help="ask about at most this many CVEs")
+    s.add_argument("--all", action="store_true", help="ask about every waiting CVE (slow without an API key)")
+    s.set_defaults(fn=cmd_nvd)
     s = sub.add_parser("search", help="search stored articles")
     s.add_argument("--q")
     s.add_argument("--severity", choices=list(queries.SEV_SQL))

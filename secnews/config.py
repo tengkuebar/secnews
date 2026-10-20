@@ -17,6 +17,7 @@ DEFAULTS = {
     "channels": {"slack": {}, "webhook": {}, "email": {}},
     "alert_rules": [],
     "watchlist": [],
+    "nvd": {"enabled": False, "api_key_env": "NVD_API_KEY", "max_per_run": 20},
 }
 
 

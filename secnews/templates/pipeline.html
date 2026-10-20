@@ -48,17 +48,6 @@
 </section>
 
 <div class="cols">
-  <section class="card half" aria-label="Who reports first">
-    <h2>Who reports first, last {{ p.first_days }} days</h2>
-    {% for name, n in p.first %}
-    <div style="display:grid;grid-template-columns:170px 1fr 44px;gap:14px;align-items:center">
-      <span>{{ name }}</span>
-      <span class="bar"><span style="width:{{ (n * 100 / p.first_max)|round(1) }}%"></span></span>
-      <span style="text-align:right;font-weight:600">{{ n }}</span>
-    </div>
-    {% else %}<span class="sub">Not enough data. This needs CVEs that two or more sources have covered.</span>{% endfor %}
-    <span class="sub">Counts CVEs covered by two or more sources, by whose article was published first. Tells you which feed to trust for speed.</span>
-  </section>
   <section class="card half" aria-label="Alert delivery">
     <h2>Alert delivery, last {{ p.alert_days }} days</h2>
     {% for ch, c in p.channels.items() %}

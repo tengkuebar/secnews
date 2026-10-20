@@ -14,6 +14,15 @@ fetching:
   timeout_seconds: 15
   retries: 3
 
+# Official scores from the NIST National Vulnerability Database. Only CVE IDs found in the news are
+# sent to NVD. Without a key NVD allows 5 requests per 30 seconds, so each cycle asks for at most
+# max_per_run CVEs. A free key (https://nvd.nist.gov/developers/request-an-api-key) raises the limit:
+# put it in the environment variable named below, never in this file.
+nvd:
+  enabled: true
+  api_key_env: NVD_API_KEY
+  max_per_run: 20
+
 sources:
   - name: Krebs on Security
     feed: https://krebsonsecurity.com/feed/

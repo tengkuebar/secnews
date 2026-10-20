@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Today{% endblock %}
 {% block body %}
 <div class="head">
@@ -43,7 +43,7 @@
     {% for i in t.decisions %}
     <div class="item">
       <div class="sevcol"><span class="badge sev-{{ i.severity }}">{{ i.severity }}</span>
-        <span class="mono sub" style="font-size:12px">{{ 'CVSS ' ~ i.cvss if i.cvss is not none else 'no score' }}</span></div>
+        <span class="mono sub" style="font-size:12px">{{ ('NVD ' if i.official else 'CVSS ') ~ i.cvss if i.cvss is not none else 'no score' }}</span></div>
       <div class="body">
         <a class="t plain" href="{{ url_for('cve_page', cve_id=i.cve_id) }}">{{ i.title }}</a>
         <div class="row" style="gap:6px">
@@ -63,7 +63,7 @@
       <span>Critical and reported as exploited. If you run one, add the product to your watchlist.</span></div>
     {% for i in t.worth %}
     <div class="item" style="align-items:center">
-      <div class="sevcol"><span class="badge sev-{{ i.severity }}">{{ i.severity }}</span><span class="mono sub" style="font-size:12px">CVSS {{ i.cvss }}</span></div>
+      <div class="sevcol"><span class="badge sev-{{ i.severity }}">{{ i.severity }}</span><span class="mono sub" style="font-size:12px">{{ 'NVD' if i.official else 'CVSS' }} {{ i.cvss }}</span></div>
       <div class="body" style="flex-basis:260px;gap:4px">
         <a class="t plain" href="{{ url_for('cve_page', cve_id=i.cve_id) }}">{{ i.title }}</a>
         <span class="sub"><span class="chipcve">{{ i.cve_id }}</span> Exploited, {{ i.sources }} source{{ '' if i.sources == 1 else 's' }}</span>
@@ -93,7 +93,12 @@
   </div>
   <div class="card" style="gap:6px">
     <h3>Official scores (NVD)</h3>
-    <span class="sub" style="line-height:1.5">Off. Scores come from what news articles and vendor advisories quote. Fetching NVD scores would fill the gaps, and needs a setting that does not exist yet.</span>
+    {% if t.nvd.enabled %}
+      <span><b class="mono">{{ t.nvd.scored }}</b> of <b class="mono">{{ t.nvd.total }}</b> recent CVEs have one.</span>
+      <span class="sub" style="line-height:1.5">secnews asks NVD for up to {{ t.nvd.max_per_run }} after each scrape. A CVE without one uses the score its articles quote. <a href="{{ url_for('settings') }}">NVD settings</a></span>
+    {% else %}
+      <span class="sub" style="line-height:1.5">Off. Scores come from what news articles and vendor advisories quote. <a href="{{ url_for('settings') }}">Turn on NVD scores</a></span>
+    {% endif %}
   </div>
 </div>
 </div>

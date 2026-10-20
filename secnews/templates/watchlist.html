@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Watchlist and alerts{% endblock %}
 {% block body %}
 <div style="display:flex;flex-direction:column;gap:4px">
@@ -76,7 +76,7 @@
   <div class="listhead"><h2 style="color:var(--ink)">What matches your watchlist</h2><span>Top {{ x.matches|length }} of {{ x.match_total }}, last {{ x.days }} days</span></div>
   {% for m in x.matches %}
   <div class="item" style="gap:6px 14px">
-    <div class="sevcol"><span class="badge sev-{{ m.severity }}">{{ m.severity }}</span><span class="mono sub" style="font-size:12px">{{ 'CVSS ' ~ m.cvss if m.cvss is not none else 'no score' }}</span></div>
+    <div class="sevcol"><span class="badge sev-{{ m.severity }}">{{ m.severity }}</span><span class="mono sub" style="font-size:12px">{{ ('NVD ' if m.official else 'CVSS ') ~ m.cvss if m.cvss is not none else 'no score' }}</span></div>
     <div class="body" style="gap:4px">
       <a class="t plain" href="{{ url_for('cve_page', cve_id=m.cve_id) }}">{{ m.title }}</a>
       <span class="sub"><b>{{ m.product }}</b> · <span class="chipcve">{{ m.cve_id }}</span> · {{ m.sources }} source{{ '' if m.sources == 1 else 's' }}{% if m.exploited %} · <b class="tone-bad">exploitation reported</b>{% endif %} · {{ m.alert }}</span>

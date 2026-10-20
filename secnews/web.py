@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import threading
 from datetime import datetime, timedelta, timezone
@@ -10,7 +11,7 @@ from pathlib import Path
 from flask import (Flask, abort, flash, g, redirect, render_template, request, session,
                    url_for)
 
-from . import db, queries, workflow
+from . import db, nvd, queries, workflow
 from .alerts import SENDERS, rule_matches, send_test
 from .config import load_config, update_config
 from .cve import severity_for
@@ -251,6 +252,7 @@ def create_app(config_path: str = "config.yaml", with_scheduler: bool = False) -
         st = workflow.state_of(row, d["cvss"], d["exploited"], datetime.now(timezone.utc))
         return render_template(
             "cve.html", nav="threats", d=d, st=st, watch=queries.watch_names(d, conf["watchlist"]),
+            nvd_on=nvd.settings(conf)["enabled"],
             alert=queries.alert_status(d, conf["alert_rules"]),
             exploit_sources=sorted({a["source"] for a in d["articles"] if a["exploited"]}),
             notes=workflow.notes_for(c, d["cve_id"]), events=workflow.history(c, d),
@@ -299,7 +301,9 @@ def create_app(config_path: str = "config.yaml", with_scheduler: bool = False) -
         c = conn()
         health = {h["name"]: h for h in queries.source_health(c, [s["name"] for s in conf["sources"]])}
         from .scheduler import next_run
+        n = nvd.settings(conf)
         return render_template("settings.html", nav="system", tab="settings", conf=conf, health=health,
+                               nvd=n, nvd_key_set=bool(os.environ.get(n["api_key_env"])), nvd_counts=nvd.counts(c),
                                next_run=next_run(app.config["SCHEDULER"]),
                                has_scheduler=app.config["SCHEDULER"] is not None)
 
@@ -314,6 +318,10 @@ def create_app(config_path: str = "config.yaml", with_scheduler: bool = False) -
             timeout = float(f.get("timeout_seconds", 15))
             retries = int(f.get("retries", 3))
             if gap < 1 or timeout < 1 or not 0 <= retries <= 10:
+                raise ValueError
+            nvd_max = int(f.get("nvd_max", nvd.DEFAULT_MAX_PER_RUN))
+            nvd_env = f.get("nvd_key_env", "NVD_API_KEY").strip() or "NVD_API_KEY"
+            if not 1 <= nvd_max <= 200 or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", nvd_env):
                 raise ValueError
         except ValueError:
             flash("Some values were out of range. Nothing was saved.", "error")
@@ -341,6 +349,7 @@ def create_app(config_path: str = "config.yaml", with_scheduler: bool = False) -
             em["smtp_host"] = f.get("smtp_host", "").strip()
             em["to"] = f.get("email_to", "").strip()
             em["password_env"] = f.get("smtp_password_env", "").strip()
+            raw["nvd"] = {"enabled": f.get("nvd_enabled") == "on", "api_key_env": nvd_env, "max_per_run": nvd_max}
 
         update_config(app.config["CONFIG_PATH"], mutate)
         if app.config["SCHEDULER"]:

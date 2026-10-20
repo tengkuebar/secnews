@@ -86,15 +86,21 @@ def cve_detail(conn, cve_id):
     arts = [dict(a) for a in arts]
     scores = [a["cvss"] for a in arts if a["cvss"] is not None]
     vendor = [a["cvss"] for a in arts if a["kind"] == "Vendor advisory" and a["cvss"] is not None]
-    shown = vendor[0] if vendor else (max(scores) if scores else None)
-    distinct = sorted(set(scores), reverse=True)
+    nrow = conn.execute("SELECT * FROM nvd_scores WHERE cve_id = ?", (cve_id,)).fetchone()
+    nvd = dict(nrow) if nrow and nrow["cvss"] is not None else None
+    # The official NVD score wins. Without one: the vendor advisory, then the highest score an article quotes.
+    shown = nvd["cvss"] if nvd else (vendor[0] if vendor else (max(scores) if scores else None))
+    distinct = sorted(set(scores) | ({nvd["cvss"]} if nvd else set()), reverse=True)
     alerts = conn.execute("SELECT rule, sent_at FROM alerts_sent WHERE cve_id = ? ORDER BY sent_at DESC",
                           (cve_id,)).fetchall()
     return {
         "cve_id": cve_id,
         "cvss": shown,
         "severity": severity_label(shown),
-        "score_source": "the vendor advisory" if vendor else ("the highest reported score" if scores else None),
+        "score_source": ("the official NVD score" if nvd else "the vendor advisory" if vendor
+                         else ("the highest reported score" if scores else None)),
+        "nvd": nvd,
+        "nvd_status": nrow["status"] if nrow and not nvd else None,   # e.g. "Awaiting Analysis"
         "conflict": distinct if len(distinct) > 1 else None,
         "affected": next((a["affected"] for a in arts if a["affected"]), None),
         "first_seen": min(a["when_"] for a in arts),
@@ -162,7 +168,7 @@ def triage(conn, rules, now=None, kpi_days=7, queue_days=30, limit=25):
         label, tone = alert_status(d, rules)
         spread = (max(d["conflict"]) - min(d["conflict"])) if d["conflict"] else 0.0
         items.append({
-            "cve_id": cid, "title": d["articles"][0]["title"], "cvss": d["cvss"],
+            "cve_id": cid, "title": d["articles"][0]["title"], "cvss": d["cvss"], "official": bool(d["nvd"]),
             "severity": d["severity"], "exploited": d["exploited"],
             "sources": d["source_count"], "articles": d["article_count"],
             "conflict": d["conflict"] if spread >= 1.0 else None,
@@ -403,7 +409,8 @@ def briefing(conn, rules, sources, now=None):
         top = week[0]
         d = cve_detail(conn, top["cve_id"])
         reporting = {a["source"] for a in d["articles"] if a["exploited"]}
-        basis = "vendor advisory score" if d["score_source"] == "the vendor advisory" else "highest score quoted"
+        basis = {"the official NVD score": "official NVD score",
+                 "the vendor advisory": "vendor advisory score"}.get(d["score_source"], "highest score quoted")
         parts = [f"{top['cve_id']} scores {d['cvss']} ({basis})." if d["cvss"] is not None
                  else f"{top['cve_id']} has no published score yet."]
         if top["conflict"]:

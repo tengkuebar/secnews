@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Weekly briefing{% endblock %}
 {% block body %}
 <a href="{{ url_for('today_page') }}" style="display:inline-flex;align-items:center;min-height:44px">← Back to Today</a>
@@ -37,7 +37,7 @@
   <div class="listhead"><h2 style="color:var(--ink)">{{ 'Three' if b.more|length == 3 else ('Two' if b.more|length == 2 else 'One') }} more to know</h2></div>
   {% for m in b.more %}
   <div class="item">
-    <div class="sevcol"><span class="badge sev-{{ m.severity }}">{{ m.severity }}</span><span class="mono sub" style="font-size:12px">{{ 'CVSS ' ~ m.cvss if m.cvss is not none else 'no score' }}</span></div>
+    <div class="sevcol"><span class="badge sev-{{ m.severity }}">{{ m.severity }}</span><span class="mono sub" style="font-size:12px">{{ ('NVD ' if m.official else 'CVSS ') ~ m.cvss if m.cvss is not none else 'no score' }}</span></div>
     <div class="body" style="gap:6px">
       <a class="t plain" href="{{ url_for('cve_page', cve_id=m.cve_id) }}">{{ m.title }}</a>
       {% if m.summary %}<span class="sub" style="line-height:1.5;max-width:80ch">{{ m.summary }}</span>{% endif %}

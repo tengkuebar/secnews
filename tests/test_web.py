@@ -85,7 +85,8 @@ def test_pipeline_page_renders(client):
     r = client.get("/pipeline")
     html = r.get_data(as_text=True)
     assert r.status_code == 200 and 'aria-current="page"' in html
-    assert "Sources healthy" in html and "Who reports first" in html and "Source A" in html
+    assert "Sources healthy" in html and "Alert delivery" in html and "Source A" in html
+    assert "Who reports first" not in html
     for tab in ("Sources", "Run log", "Settings"):
         assert f">{tab}</a>" in html
 
@@ -235,6 +236,34 @@ def test_settings_save_writes_config_and_validates(client, app):
     bad = client.post("/settings", data={"csrf": t, "interval_minutes": "0"})
     assert bad.status_code == 302
     assert yaml.safe_load(app.cfg_path.read_text(encoding="utf-8"))["scheduler"]["interval_minutes"] == 30
+
+
+def test_nvd_settings_save_and_validate(client, app):
+    t = token(client, "/settings")
+    base = {"csrf": t, "interval_minutes": "30", "quiet_start": "23:00", "quiet_end": "06:00",
+            "seconds_between_requests": "2", "timeout_seconds": "10", "retries": "2", "user_agent": "ua"}
+    assert "Fetch official scores" in client.get("/settings").get_data(as_text=True)
+    client.post("/settings", data={**base, "nvd_enabled": "on", "nvd_key_env": "MY_NVD", "nvd_max": "40"})
+    assert yaml.safe_load(app.cfg_path.read_text(encoding="utf-8"))["nvd"] == \
+        {"enabled": True, "api_key_env": "MY_NVD", "max_per_run": 40}
+    for bad in ({"nvd_max": "0"}, {"nvd_max": "500"}, {"nvd_key_env": "has space"}, {"nvd_key_env": "x=1"}):
+        client.post("/settings", data={**base, "nvd_enabled": "on", **bad})
+    assert yaml.safe_load(app.cfg_path.read_text(encoding="utf-8"))["nvd"]["max_per_run"] == 40
+
+
+def test_cve_page_shows_official_score_block(client, app):
+    html = client.get("/cve/CVE-2026-0002").get_data(as_text=True)
+    assert "Official score (NVD)" in html and "Not checked yet" in html and "switched off" in html
+    from secnews.config import load_config
+    conn = db.init_db(load_config(app.cfg_path)["database"])
+    conn.execute("INSERT INTO nvd_scores(cve_id,cvss,severity,version,vector,status,fetched_at) "
+                 "VALUES ('CVE-2026-0002', 8.1, 'High', '3.1', 'CVSS:3.1/AV:N/AC:L', 'Analyzed', '2026-10-08T00:00:00Z')")
+    conn.commit()
+    conn.close()
+    html = client.get("/cve/CVE-2026-0002").get_data(as_text=True)
+    assert "CVSS:3.1/AV:N/AC:L" in html and "from the official NVD score" in html
+    assert "Sources disagree on the score: 8.1 vs 5.3" in html
+    assert "NVD 8.1" in client.get("/threats").get_data(as_text=True)
 
 
 def test_settings_page_never_prints_secret_values(client, monkeypatch):

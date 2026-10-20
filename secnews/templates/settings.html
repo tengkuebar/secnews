@@ -72,6 +72,17 @@
 </div>
 
 <div class="card" style="padding:20px">
+  <div><h2>Official scores (NVD)</h2><div class="sub">Asks the NIST National Vulnerability Database for the official score of CVEs found in the news. Only CVE numbers are sent. An official score replaces the one an article quotes.</div></div>
+  <label class="check"><input type="checkbox" name="nvd_enabled" {{ 'checked' if nvd.enabled }}> Fetch official scores after each scrape</label>
+  <div class="fields">
+    <label class="f">API key variable (optional)<input type="text" class="mono" name="nvd_key_env" value="{{ nvd.api_key_env }}"></label>
+    <label class="f">Most CVEs to ask about per scrape<input type="number" name="nvd_max" value="{{ nvd.max_per_run }}" min="1" max="200"></label>
+  </div>
+  <div class="sub">{% if nvd_key_set %}An API key is set on this PC, so requests are sent 0.7 seconds apart (up to 50 per 30 seconds).{% else %}No API key set. NVD allows 5 requests per 30 seconds without one, so each request waits 6.5 seconds. 20 CVEs take about 2 minutes. A free key from nvd.nist.gov removes the wait.{% endif %}
+    {% if nvd_counts %}Official scores so far: {{ nvd_counts.scored }} of {{ nvd_counts.total }} recent CVEs.{% endif %}</div>
+</div>
+
+<div class="card" style="padding:20px">
   <div><h2>Polite fetching</h2><div class="sub">Respecting robots.txt is always on.</div></div>
   <div class="fields">
     <label class="f">Seconds between requests per host<input type="number" name="seconds_between_requests" value="{{ conf.fetching.seconds_between_requests }}" min="1" step="1"></label>

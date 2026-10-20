@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Threats{% endblock %}
 {% block body %}
 <div style="display:flex;flex-direction:column;gap:4px">
@@ -31,7 +31,7 @@
   {% for i in th.rows %}
   <div class="item">
     <div class="sevcol"><span class="badge sev-{{ i.severity }}">{{ i.severity }}</span>
-      <span class="mono sub" style="font-size:12px">{{ 'CVSS ' ~ i.cvss if i.cvss is not none else 'no score' }}</span></div>
+      <span class="mono sub" style="font-size:12px">{{ ('NVD ' if i.official else 'CVSS ') ~ i.cvss if i.cvss is not none else 'no score' }}</span></div>
     <div class="body">
       <a class="t plain" href="{{ url_for('cve_page', cve_id=i.cve_id) }}">{{ i.title }}</a>
       <div class="row" style="gap:6px">

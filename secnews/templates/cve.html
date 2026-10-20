@@ -84,10 +84,23 @@
       <a class="btn outline" href="{{ url_for('rule_new', keywords=d.affected or '') }}">Create alert rule for this software</a>
     </section>
 
+    <section class="card" aria-label="Official score" style="gap:6px">
+      <h2>Official score (NVD)</h2>
+      {% if d.nvd %}
+        <span><b class="mono" style="font-size:18px">{{ d.nvd.cvss }}</b> <span class="badge sev-{{ d.severity }}">{{ d.severity }}</span></span>
+        <span class="sub mono" style="font-size:12px;overflow-wrap:anywhere">CVSS v{{ d.nvd.version }}{% if d.nvd.vector %} · {{ d.nvd.vector }}{% endif %}</span>
+        <span class="sub" style="font-size:12px">NVD status: {{ d.nvd.status or 'unknown' }}. Checked {{ d.nvd.fetched_at|short }} UTC.</span>
+      {% elif d.nvd_status %}
+        <span class="sub" style="line-height:1.5">NVD has no score yet ({{ d.nvd_status }}). secnews asks again every few hours. Until then the score comes from {{ d.score_source or 'no source' }}.</span>
+      {% else %}
+        <span class="sub" style="line-height:1.5">Not checked yet. {{ 'secnews asks NVD for a few CVEs after every scrape.' if nvd_on else 'NVD scores are switched off in Settings.' }}</span>
+      {% endif %}
+    </section>
+
     <section class="card" aria-label="Where to act" style="gap:2px">
       <h2>Where to act</h2>
       <a href="https://nvd.nist.gov/vuln/detail/{{ d.cve_id }}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;min-height:44px">NVD record (official, opens nvd.nist.gov)</a>
-      {% for a in advisories %}<a href="{{ a.url }}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;min-height:44px">Vendor advisory: {{ a.source }}</a>{% endfor %}
+      {% for a in advisories %}<a href="{{ a.url }}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;min-height:44px">Advisory: {{ a.title|excerpt(60) }} ({{ a.source }})</a>{% endfor %}
     </section>
 
     <section class="card" aria-label="History">

@@ -68,6 +68,17 @@ CREATE TABLE IF NOT EXISTS reviews (
     updated_at      TEXT NOT NULL
 );
 
+-- Official scores from NVD. cvss stays NULL while NVD has the record but has not analysed it yet.
+CREATE TABLE IF NOT EXISTS nvd_scores (
+    cve_id     TEXT PRIMARY KEY,
+    cvss       REAL,
+    severity   TEXT,
+    version    TEXT,
+    vector     TEXT,
+    status     TEXT,
+    fetched_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS cve_notes (
     id         INTEGER PRIMARY KEY,
     cve_id     TEXT NOT NULL,

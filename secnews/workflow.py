@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from . import queries
+from . import nvd, queries
 
 SNOOZES = {"1": ("1 day", 1), "3": ("3 days", 3), "7": ("1 week", 7),
            "change": ("until the score changes", None)}
@@ -168,6 +168,7 @@ def today(conn, conf: dict, now: datetime | None = None) -> dict:
         "snoozed_n": sum(1 for i in items if i["state"] == "snoozed"),
         "reviewed_today": reviewed_today,
         "all_clear": not decisions and not worth,
+        "nvd": {**nvd.settings(conf), **nvd.counts(conn)},
     }
 
 
