@@ -3,25 +3,39 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Threat Feed{% endblock %}</title>
+<title>{% block title %}Today{% endblock %} · secnews</title>
+<meta name="color-scheme" content="light dark">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
-<body class="{{ theme|default('') }}">
+<body>
+<a class="skip" href="#content">Skip to the page</a>
 <div class="wrap">
 <nav class="main" aria-label="Main">
-  <a href="{{ url_for('triage_page') }}" class="{{ 'on' if nav == 'triage' }}">Triage</a>
-  <a href="{{ url_for('feed') }}" class="{{ 'on' if nav == 'feed' }}">Feed</a>
-  <a href="{{ url_for('exposure_page') }}" class="{{ 'on' if nav == 'exposure' }}">My exposure</a>
-  <a href="{{ url_for('briefing_page') }}" class="{{ 'on' if nav == 'briefing' }}">Briefing</a>
-  <a href="{{ url_for('pipeline_page') }}" class="{{ 'on' if nav == 'pipeline' }}">Pipeline</a>
-  <a href="{{ url_for('runs') }}" class="{{ 'on' if nav == 'runs' }}">Run log</a>
-  <a href="{{ url_for('rule_new') }}" class="{{ 'on' if nav == 'rules' }}">Alert rules</a>
-  <a href="{{ url_for('settings') }}" class="{{ 'on' if nav == 'settings' }}">Settings</a>
+  <a href="{{ url_for('today_page') }}" {% if nav == 'today' %}class="on" aria-current="page"{% endif %}>Today</a>
+  <a href="{{ url_for('threats_page') }}" {% if nav == 'threats' %}class="on" aria-current="page"{% endif %}>Threats</a>
+  <a href="{{ url_for('watchlist_page') }}" {% if nav == 'watch' %}class="on" aria-current="page"{% endif %}>Watchlist and alerts</a>
+  <a href="{{ url_for('pipeline_page') }}" {% if nav == 'system' %}class="on" aria-current="page"{% endif %}>System</a>
+  <button type="button" id="theme-toggle" class="btn" hidden>
+    <svg class="bulb" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="glass" d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2h5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>
+    <span class="lbl">Dark mode</span></button>
 </nav>
+<main id="content">
 {% with msgs = get_flashed_messages(with_categories=true) %}
   {% for cat, m in msgs %}<div class="flash {{ cat }}" role="status">{{ m }}</div>{% endfor %}
 {% endwith %}
 {% block body %}{% endblock %}
+</main>
 </div>
+{% if undo %}
+<div class="toast" role="status">
+  <span>{{ undo.text }}</span>
+  <form method="post" action="{{ url_for('cve_state', cve_id=undo.cve) }}" style="margin:0">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="action" value="open">
+    <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+    <button>Undo</button>
+  </form>
+</div>
+{% endif %}
 </body>
 </html>

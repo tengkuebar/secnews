@@ -1,75 +1,71 @@
 {% extends "base.html" %}
 {% block title %}Weekly briefing{% endblock %}
 {% block body %}
-<header class="ed-mast">
-  <div style="display:flex;flex-direction:column;gap:10px">
-    <span class="ed-meta">{{ b.start.strftime('%d %B').lstrip('0') }} to {{ b.end.strftime('%d %B %Y').lstrip('0') }}</span>
-    <h1>The week in vulnerabilities</h1>
-  </div>
-  <span class="ed-meta" style="max-width:32ch;line-height:1.4">A three-minute read, built from {{ b.articles_read }} article{{ '' if b.articles_read == 1 else 's' }} across {{ b.sources_n }} source{{ '' if b.sources_n == 1 else 's' }}.</span>
-</header>
+<a href="{{ url_for('today_page') }}" style="display:inline-flex;align-items:center;min-height:44px">← Back to Today</a>
+
+<div style="display:flex;flex-direction:column;gap:4px">
+  <h1>The week in vulnerabilities</h1>
+  <span class="sub">{{ b.start.strftime('%d %B').lstrip('0') }} to {{ b.end.strftime('%d %B %Y').lstrip('0') }} · built from {{ b.articles_read }} article{{ '' if b.articles_read == 1 else 's' }} across {{ b.sources_n }} source{{ '' if b.sources_n == 1 else 's' }}</span>
+</div>
 
 {% if b.lead %}
-<section class="ed-lead" aria-label="Lead">
-  <div style="flex:3 1 520px;min-width:0;display:flex;flex-direction:column;gap:16px">
-    <span class="ed-kicker">The one to act on</span>
-    <h2><a href="{{ b.lead.url }}" rel="noopener noreferrer" target="_blank">{{ b.lead.title }}</a></h2>
-    <p class="ed-deck">{{ b.lead.deck }}</p>
-    <span class="ed-idline">{{ b.lead.cve_id }} · headline from {{ b.lead.source }}</span>
-    <a href="{{ url_for('cve_page', cve_id=b.lead.cve_id) }}" style="font-weight:700;display:inline-flex;align-items:center;min-height:44px">Read the full comparison</a>
+<section class="card" aria-label="Lead" style="padding:22px 24px;flex-direction:row;flex-wrap:wrap;gap:20px 40px;justify-content:space-between;align-items:flex-end">
+  <div style="display:flex;flex-direction:column;gap:10px;min-width:0;flex:1 1 480px">
+    <span class="tone-bad" style="font-size:12px;font-weight:600">The one to act on</span>
+    <h2 style="font-size:22px;line-height:1.3"><a class="plain" style="color:var(--ink)" href="{{ url_for('cve_page', cve_id=b.lead.cve_id) }}">{{ b.lead.title }}</a></h2>
+    <p style="margin:0;font-size:15px;line-height:1.55;max-width:62ch">{{ b.lead.deck }}</p>
+    <span class="sub"><span class="chipcve">{{ b.lead.cve_id }}</span> · headline from {{ b.lead.source }} · <a href="{{ url_for('cve_page', cve_id=b.lead.cve_id) }}">Compare the sources</a></span>
   </div>
-  <div style="flex:1 1 240px;display:flex;flex-direction:column;gap:4px;align-self:flex-end">
-    <span class="ed-num sevtxt-{{ b.lead.severity }}" style="font-size:112px;line-height:.9">{{ b.lead.cvss if b.lead.cvss is not none else '–' }}</span>
-    <span class="ed-meta">{{ b.lead.severity|lower }}{% if b.lead.cvss is none %} · no score yet{% endif %}</span>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+    <span class="badge sev-{{ b.lead.severity }}" style="width:76px">{{ b.lead.severity }}</span>
+    <span class="score" style="font-size:48px">{{ b.lead.cvss if b.lead.cvss is not none else '–' }}</span>
   </div>
 </section>
 {% else %}
-<div class="ed-empty">No CVE was first seen in the last 7 days. Run a scrape, or check the <a href="{{ url_for('pipeline_page') }}">pipeline</a> in case a source is down.</div>
+<div class="card empty">No CVE was first seen in the last 7 days. Run a scrape, or check the <a href="{{ url_for('pipeline_page') }}">system page</a> in case a source is down.</div>
 {% endif %}
 
-<section class="ed-stats" aria-label="By the numbers">
-  <div><div class="n ed-num">{{ b.numbers.new }}</div><div class="l">new CVEs this week</div><div class="d">{{ b.numbers.new_note }}</div></div>
-  <div><div class="n ed-num">{{ b.numbers.exploited }}</div><div class="l">with exploitation reported</div><div class="d">At least one article says attacks are under way.</div></div>
-  <div><div class="n ed-num">{{ b.numbers.disagree }}</div><div class="l">where sources disagree</div><div class="d">Quoted scores differ by 1.0 or more.</div></div>
-  <div><div class="n ed-num">{{ b.numbers.alerts }}</div><div class="l">alerts sent</div><div class="d">One per rule per CVE.</div></div>
+<section class="grid4" aria-label="By the numbers">
+  <div class="card tile"><span class="sub">New CVEs this week</span><span class="v">{{ b.numbers.new }}</span><span class="sub">{{ b.numbers.new_note }}</span></div>
+  <div class="card tile"><span class="sub">Reported as exploited</span><span class="v">{{ b.numbers.exploited }}</span><span class="sub">At least one article says attacks are under way.</span></div>
+  <div class="card tile"><span class="sub">Where sources disagree</span><span class="v">{{ b.numbers.disagree }}</span><span class="sub">Quoted scores differ by 1.0 or more.</span></div>
+  <div class="card tile"><span class="sub">Alerts sent</span><span class="v">{{ b.numbers.alerts }}</span><span class="sub">One per rule per CVE.</span></div>
 </section>
 
 {% if b.more %}
-<section class="ed-sec" aria-label="More to know">
-  <h2>{{ 'Three' if b.more|length == 3 else ('Two' if b.more|length == 2 else 'One') }} more to know</h2>
-  <div class="ed-three">
-    {% for m in b.more %}
-    <article style="display:flex;flex-direction:column;gap:10px">
-      <span class="ed-idline"><span class="ed-num">{{ m.cve_id }}</span> · <span class="ed-num sevtxt-{{ m.severity }}">{{ m.cvss if m.cvss is not none else 'no score' }}</span></span>
-      <h3><a href="{{ m.url }}" rel="noopener noreferrer" target="_blank">{{ m.title }}</a></h3>
-      {% if m.summary %}<p>{{ m.summary }}</p>{% endif %}
-      <span class="ed-idline">{{ m.source }} · {{ m.sources }} source{{ '' if m.sources == 1 else 's' }}{% if m.exploited %} · exploitation reported{% endif %} · <a href="{{ url_for('cve_page', cve_id=m.cve_id) }}">compare sources</a></span>
-    </article>
-    {% endfor %}
+<section class="card flush" aria-label="More to know">
+  <div class="listhead"><h2 style="color:var(--ink)">{{ 'Three' if b.more|length == 3 else ('Two' if b.more|length == 2 else 'One') }} more to know</h2></div>
+  {% for m in b.more %}
+  <div class="item">
+    <div class="sevcol"><span class="badge sev-{{ m.severity }}">{{ m.severity }}</span><span class="mono sub" style="font-size:12px">{{ 'CVSS ' ~ m.cvss if m.cvss is not none else 'no score' }}</span></div>
+    <div class="body" style="gap:6px">
+      <a class="t plain" href="{{ url_for('cve_page', cve_id=m.cve_id) }}">{{ m.title }}</a>
+      {% if m.summary %}<span class="sub" style="line-height:1.5;max-width:80ch">{{ m.summary }}</span>{% endif %}
+      <span class="sub" style="font-size:12px"><span class="chipcve">{{ m.cve_id }}</span> · {{ m.source }} · {{ m.sources }} source{{ '' if m.sources == 1 else 's' }}{% if m.exploited %} · exploitation reported{% endif %}</span>
+    </div>
   </div>
+  {% endfor %}
 </section>
 {% endif %}
 
-<section class="ed-bottom" aria-label="Trend and changes">
-  <div style="flex:3 1 480px;min-width:0;display:flex;flex-direction:column;gap:14px">
-    <h2 style="margin:0;font-size:32px;font-weight:700;letter-spacing:-.01em">New CVEs per week</h2>
+<div class="cols">
+  <section class="card" aria-label="Trend" style="flex:3 1 480px;min-width:0">
+    <div class="head"><h2>New CVEs per week</h2><span class="mono" style="font-size:13px">{{ b.weeks[-1] }} this week</span></div>
     <svg viewBox="0 0 560 220" role="img" aria-label="New CVEs per week for the last 8 weeks: {{ b.weeks|join(', ') }}" style="width:100%;height:auto;display:block">
       {% for r in bars %}
-        {% if r.h %}<rect x="{{ r.x }}" y="{{ r.y }}" width="{{ r.w }}" height="{{ r.h }}" fill="{{ '#B3261E' if r.last else '#111111' }}"/>{% endif %}
-        <text x="{{ r.cx }}" y="{{ r.y - 8 }}" text-anchor="middle" font-family="Ubuntu Mono, monospace" font-size="16" fill="{{ '#B3261E' if r.last else '#111111' }}">{{ r.v }}</text>
+        {% if r.h %}<rect x="{{ r.x }}" y="{{ r.y }}" width="{{ r.w }}" height="{{ r.h }}" style="fill:{{ 'var(--crit)' if r.last else 'var(--accent)' }}"/>{% endif %}
+        <text x="{{ r.cx }}" y="{{ r.y - 8 }}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="15" style="fill:var(--ink)">{{ r.v }}</text>
       {% endfor %}
-      <line x1="0" y1="200" x2="560" y2="200" stroke="#111111" stroke-width="2"/>
-      <text x="{{ bars[0].cx }}" y="218" text-anchor="middle" font-size="15" fill="#555555" font-family="Gelasio, Georgia, serif">8 wks ago</text>
-      <text x="{{ bars[-1].cx }}" y="218" text-anchor="middle" font-size="15" fill="#555555" font-family="Gelasio, Georgia, serif">This week</text>
+      <line x1="0" y1="200" x2="560" y2="200" style="stroke:var(--line)" stroke-width="2"/>
+      <text x="{{ bars[0].cx }}" y="218" text-anchor="middle" font-size="13" style="fill:var(--muted)" font-family="IBM Plex Sans, sans-serif">8 wks ago</text>
+      <text x="{{ bars[-1].cx }}" y="218" text-anchor="middle" font-size="13" style="fill:var(--muted)" font-family="IBM Plex Sans, sans-serif">This week</text>
     </svg>
-    <p style="margin:0;font-size:18px;line-height:1.5;color:#333">Counts are CVEs first seen in each 7-day window, ending now.</p>
-  </div>
-  <div style="flex:2 1 340px;min-width:0;display:flex;flex-direction:column;gap:14px">
-    <h2 style="margin:0;font-size:32px;font-weight:700;letter-spacing:-.01em">What changed</h2>
-    <ul class="ed-changes">
-      {% for c in b.changes %}<li><b>{{ c.k }}</b> {{ c.t }}</li>
-      {% else %}<li>Nothing has changed since the last alerts, and every source is running.</li>{% endfor %}
-    </ul>
-  </div>
-</section>
+    <span class="sub">Counts are CVEs first seen in each 7-day window, ending now.</span>
+  </section>
+  <section class="card" aria-label="What changed" style="flex:2 1 340px;min-width:0;gap:4px">
+    <h2 style="margin-bottom:6px">What changed</h2>
+    {% for c in b.changes %}<div style="border-top:1px solid var(--line2);padding:10px 0;line-height:1.5"><b>{{ c.k }}</b> {{ c.t }}</div>
+    {% else %}<div style="border-top:1px solid var(--line2);padding:10px 0;line-height:1.5">Nothing has changed since the last alerts, and every source is running.</div>{% endfor %}
+  </section>
+</div>
 {% endblock %}

@@ -1,0 +1,13 @@
+{# Reviewed / snooze buttons for one CVE. Expects: cve_id, next (where to go back to), snoozes, and optionally dismiss. #}
+<form method="post" action="{{ url_for('cve_state', cve_id=cve_id) }}" class="row" style="margin:0">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ next }}">
+  {% if dismiss %}
+    <button class="btn" name="action" value="dismiss">Dismiss</button>
+  {% else %}
+    <button class="btn primary" name="action" value="reviewed">Reviewed</button>
+    <button class="btn" name="action" value="snoozed" onclick="this.form.snooze.value='1'">Snooze 1 day</button>
+    <button class="btn" name="action" value="snoozed" onclick="this.form.snooze.value='7'">Snooze 1 week</button>
+    <input type="hidden" name="snooze" value="1">
+  {% endif %}
+</form>

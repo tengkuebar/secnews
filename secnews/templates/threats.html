@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Threats{% endblock %}
+{% block body %}
+<div style="display:flex;flex-direction:column;gap:4px">
+  <h1>Threats</h1>
+  <span class="sub">Every CVE from the last 30 days, one row each. Review or snooze to clear it from Today. It comes back if its score rises or exploitation is first reported.</span>
+</div>
+
+<form class="card" method="get" action="{{ url_for('threats_page') }}" role="search">
+  <div class="row" style="gap:12px">
+    <label class="sub" for="q">Search</label>
+    <input id="q" type="search" name="q" value="{{ q }}" placeholder="CVE number, product or keyword" class="mono" style="flex:1 1 260px;max-width:460px;width:auto">
+    <label class="check"><input type="checkbox" name="watch" value="1" {{ 'checked' if watch_only }}> Watchlist only</label>
+    {% if tab != 'open' %}<input type="hidden" name="state" value="{{ tab }}">{% endif %}
+    {% if sev != 'All' %}<input type="hidden" name="severity" value="{{ sev }}">{% endif %}
+    <button class="primary" type="submit">Search</button>
+  </div>
+  <div class="row"><span class="sub" style="margin-right:4px">State</span>
+    {% for key, label in tabs %}<a class="chip {{ 'on' if tab == key }}" {% if tab == key %}aria-current="true"{% endif %} href="{{ link(state=key) }}">{{ label }} <span class="mono" style="font-size:12px">{{ th.counts[key] }}</span></a>{% endfor %}
+  </div>
+  <div class="row"><span class="sub" style="margin-right:4px">Severity</span>
+    {% for s in severities %}<a class="chip {{ 'on' if sev == s }}" {% if sev == s %}aria-current="true"{% endif %} href="{{ link(severity=s) }}">{{ s }}</a>{% endfor %}
+  </div>
+</form>
+
+<div class="card flush">
+  <div class="listhead">
+    <span>{% if th.total %}Showing {{ th.first }} to {{ th.last }} of {{ th.total }} CVE{{ '' if th.total == 1 else 's' }}{% else %}0 CVEs{% endif %}</span>
+    <span>Sorted by score, then exploitation, then sources</span>
+  </div>
+  {% for i in th.rows %}
+  <div class="item">
+    <div class="sevcol"><span class="badge sev-{{ i.severity }}">{{ i.severity }}</span>
+      <span class="mono sub" style="font-size:12px">{{ 'CVSS ' ~ i.cvss if i.cvss is not none else 'no score' }}</span></div>
+    <div class="body">
+      <a class="t plain" href="{{ url_for('cve_page', cve_id=i.cve_id) }}">{{ i.title }}</a>
+      <div class="row" style="gap:6px">
+        <span class="chipcve">{{ i.cve_id }}</span>
+        <span class="tag">{{ i.sources }} source{{ '' if i.sources == 1 else 's' }}</span>
+        {% if i.product %}<span class="tag watch">{{ i.product }}</span>{% endif %}
+        {% for text, hot in i.reasons %}<span class="tag {{ 'hot' if hot }}">{{ text }}</span>{% endfor %}
+      </div>
+    </div>
+    <div class="act">
+      <span style="font-size:13px;font-weight:600" class="{{ 'tone-bad' if i.state == 'open' else ('tone-ok' if i.state == 'reviewed' else 'tone-none') }}">{{ i.label }}</span>
+      <form method="post" action="{{ url_for('cve_state', cve_id=i.cve_id) }}" class="row" style="margin:0">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ here }}">
+        {% if i.state == 'open' %}
+          <button class="btn" name="action" value="reviewed">Reviewed</button>
+          <button class="btn" name="action" value="snoozed">Snooze</button><input type="hidden" name="snooze" value="1">
+        {% else %}
+          <button class="btn" name="action" value="open">Reopen</button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty">{% if th.counts.all == 0 %}No CVE matches these filters. Clear the search, or run a scrape.{% else %}Nothing in this state. Try another state above.{% endif %}</div>
+  {% endfor %}
+  {% if th.pages > 1 %}
+  <nav class="pager" aria-label="Pagination">
+    {% if th.page > 1 %}<a aria-label="Previous page" href="{{ link(page=th.page - 1) }}">←</a>{% else %}<span class="off" aria-hidden="true">←</span>{% endif %}
+    {% for p in pitems %}{% if p.ellipsis %}<span class="dots" aria-hidden="true">…</span>
+    {% else %}<a class="{{ 'cur' if p.current }}" aria-label="Page {{ p.n }}" {% if p.current %}aria-current="page"{% endif %} href="{{ link(page=p.n) }}">{{ p.n }}</a>{% endif %}{% endfor %}
+    {% if th.page < th.pages %}<a aria-label="Next page" href="{{ link(page=th.page + 1) }}">→</a>{% else %}<span class="off" aria-hidden="true">→</span>{% endif %}
+  </nav>
+  {% endif %}
+</div>
+<span class="sub" style="font-size:12px">Scores are the ones quoted by articles and vendor advisories. They can differ between outlets: the CVE page lists each one.</span>
+{% endblock %}

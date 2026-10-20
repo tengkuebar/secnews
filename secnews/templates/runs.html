@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Run log{% endblock %}
 {% block body %}
+{% include "_systemtabs.html" %}
 <div class="head">
-  <div><h1>Run log</h1><div class="sub">Every scrape and every alert, so a broken feed never hides behind a quiet news day.</div></div>
-  <form method="post" action="{{ url_for('scrape_now') }}">
-    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <div class="sub">Every scrape and every alert, so a broken feed never hides behind a quiet news day.</div>
+  <form method="post" action="{{ url_for('scrape_now') }}" style="margin:0">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('runs') }}">
     <button class="primary">Run scrape now</button>
   </form>
 </div>
@@ -15,7 +16,7 @@
   <div class="card tile"><span class="sub">Last successful scrape</span><span class="v" style="font-size:20px">{{ (stats.last_ok|short) or 'never' }}</span></div>
 </div>
 <div class="card row"><span class="sub" style="margin-right:4px">Show</span>
-  {% for t in tabs %}<a class="chip {{ 'on' if show == t }}" href="{{ url_for('runs', show=t) }}">{{ t }}</a>{% endfor %}
+  {% for t in tabs %}<a class="chip {{ 'on' if show == t }}" {% if show == t %}aria-current="true"{% endif %} href="{{ url_for('runs', show=t) }}">{{ t }}</a>{% endfor %}
 </div>
 <div class="card flush table">
   <div class="tr th"><span>Time (UTC)</span><span>Source or rule</span><span>Type</span><span>Result</span><span>Status</span></div>

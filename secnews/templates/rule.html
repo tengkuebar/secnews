@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}New alert rule{% endblock %}
 {% block body %}
-<a href="{{ url_for('settings') }}" style="display:inline-flex;align-items:center;min-height:44px">← Back to automation settings</a>
+<a href="{{ url_for('watchlist_page') }}" style="display:inline-flex;align-items:center;min-height:44px">← Back to watchlist and alerts</a>
 <div><h1>New alert rule</h1><div class="sub">A rule fires once per CVE when every condition you set matches.</div></div>
 
 <form method="post" action="{{ url_for('rule_new') }}" class="cols">
@@ -28,7 +28,7 @@
     <label class="check"><input type="checkbox" name="realert" {{ 'checked' if rule.realert_on_change }}> Alert again if the CVSS score rises or exploitation is first reported</label>
   </div>
   <div class="row" style="justify-content:flex-end">
-    <a class="btn" href="{{ url_for('settings') }}">Cancel</a>
+    <a class="btn" href="{{ url_for('watchlist_page') }}">Cancel</a>
     <button type="submit" name="action" value="test">Test rule</button>
     <button type="submit" name="action" value="save" class="primary">Save rule</button>
   </div>

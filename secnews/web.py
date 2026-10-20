@@ -1,4 +1,4 @@
-"""Flask dashboard: feed, CVE detail, run log, rule editor, automation settings."""
+"""Flask dashboard: Today, Threats, CVE detail, Watchlist and alerts, System (sources, run log, settings)."""
 from __future__ import annotations
 
 import os
@@ -10,7 +10,7 @@ from pathlib import Path
 from flask import (Flask, abort, flash, g, redirect, render_template, request, session,
                    url_for)
 
-from . import db, queries
+from . import db, queries, workflow
 from .alerts import SENDERS, rule_matches, send_test
 from .config import load_config, update_config
 from .cve import severity_for
@@ -104,45 +104,77 @@ def create_app(config_path: str = "config.yaml", with_scheduler: bool = False) -
             "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; form-action 'self'"
         return resp
 
-    # ------------------------------------------------------------ feed
-    @app.get("/")
-    def feed():
-        q = request.args.get("q", "").strip()
-        sev = request.args.get("severity", "All")
-        src = request.args.get("source", "All")
-        page = max(1, request.args.get("page", 1, type=int))
-        c = conn()
-        rows, total = queries.search_articles(
-            c, q=q or None, severity=sev if sev in SEVERITIES else None,
-            source=None if src == "All" else src, page=page, per_page=PER_PAGE)
-        pages = max(1, -(-total // PER_PAGE))
-        if page > pages:
-            return redirect(url_for("feed", q=q, severity=sev, source=src, page=pages))
-        conf = cfg()
-        names = [s["name"] for s in conf["sources"]]
-        counts = queries.weekly_cve_counts(c)
-        first = (page - 1) * PER_PAGE + 1
-        return render_template(
-            "feed.html", nav="feed", rows=rows, total=total, page=page, pages=pages,
-            first=first, last=first + len(rows) - 1, q=q, sev=sev, src=src,
-            severities=["All"] + SEVERITIES, sources=["All"] + names,
-            pitems=page_items(page, pages), stats=queries.stats(c),
-            spark=sparkline(counts), week_count=counts[-1],
-            rules=conf["alert_rules"], health=queries.source_health(c, names),
-            last_run=queries.run_stats(c)["last_ok"])
+    def safe_next(default: str) -> str:
+        """Only follow a redirect target that stays on this site."""
+        n = request.form.get("next", "")
+        return n if n.startswith("/") and not n.startswith("//") and "\\" not in n else default
 
-    # ---------------------------------------------------------- triage
+    @app.context_processor
+    def toast():
+        return {"undo": session.pop("undo", None)}
+
+    # ----------------------------------------------------------- today
+    @app.get("/")
+    def today_page():
+        conf = cfg()
+        c = conn()
+        counts = queries.weekly_cve_counts(c)
+        return render_template(
+            "today.html", nav="today", t=workflow.today(c, conf), spark=sparkline(counts),
+            week_count=counts[-1], last_run=queries.run_stats(c)["last_ok"],
+            today_label=datetime.now().strftime("%A %d %B").replace(" 0", " "))
+
     @app.get("/triage")
     def triage_page():
-        t = queries.triage(conn(), cfg()["alert_rules"])
-        return render_template("triage.html", nav="triage", theme="matrix", t=t)
+        return redirect(url_for("today_page"), 301)
 
-    # --------------------------------------------------------- exposure
-    @app.get("/exposure")
-    def exposure_page():
+    # --------------------------------------------------------- threats
+    @app.get("/threats")
+    def threats_page():
+        tab = request.args.get("state", "open")
+        sev = request.args.get("severity", "All")
+        q = request.args.get("q", "").strip()[:80]
+        watch_only = request.args.get("watch") == "1"
+        page = max(1, request.args.get("page", 1, type=int))
+        tab = tab if tab in dict(workflow.TABS) else "open"
+        sev = sev if sev in SEVERITIES else "All"
+        th = workflow.threats(conn(), cfg(), tab=tab, sev=sev, q=q, watch_only=watch_only, page=page,
+                              per_page=PER_PAGE)
+
+        def link(**over):
+            args = {"state": tab, "severity": sev, "q": q, "watch": "1" if watch_only else None, "page": None}
+            args.update(over)
+            return url_for("threats_page", **{k: v for k, v in args.items()
+                                              if v not in (None, "", "All") and not (k == "state" and v == "open")})
+
+        return render_template("threats.html", nav="threats", th=th, tab=tab, sev=sev, q=q,
+                               watch_only=watch_only, tabs=workflow.TABS, severities=["All"] + SEVERITIES,
+                               pitems=page_items(th["page"], th["pages"]), link=link,
+                               here=request.full_path.rstrip("?"))
+
+    # ------------------------------------------------------- watchlist
+    def channel_rows(conf: dict) -> list[dict]:
+        ch = conf["channels"]
+        rows = []
+        for name, env in (("Slack", ch["slack"].get("webhook_env")), ("Email", ch["email"].get("password_env")),
+                          ("Webhook", ch["webhook"].get("url_env"))):
+            ok = bool(env and os.environ.get(env))
+            if name == "Email":
+                ok = ok and bool(ch["email"].get("smtp_host") and ch["email"].get("to"))
+            rows.append({"name": name, "key": name.lower(), "env": env or "not named yet", "ok": ok})
+        return rows
+
+    @app.get("/watchlist")
+    def watchlist_page():
         conf = cfg()
         x = queries.exposure(conn(), conf["watchlist"], conf["alert_rules"], conf["sources"])
-        return render_template("exposure.html", nav="exposure", theme="bento", x=x)
+        return render_template("watchlist.html", nav="watch", x=x, rules=conf["alert_rules"],
+                               channels=channel_rows(conf),
+                               rules_on=sum(1 for r in conf["alert_rules"] if r.get("enabled", True)))
+
+    @app.get("/exposure")
+    def exposure_page():
+        return redirect(url_for("watchlist_page"), 301)
 
     @app.post("/exposure/add")
     def exposure_add():
@@ -163,7 +195,7 @@ def create_app(config_path: str = "config.yaml", with_scheduler: bool = False) -
                 entry["match"] = terms
             update_config(app.config["CONFIG_PATH"], lambda raw: raw.setdefault("watchlist", []).append(entry))
             flash(f"Now watching {name}.", "ok")
-        return redirect(url_for("exposure_page"))
+        return redirect(url_for("watchlist_page"))
 
     @app.post("/exposure/remove")
     def exposure_remove():
@@ -174,28 +206,81 @@ def create_app(config_path: str = "config.yaml", with_scheduler: bool = False) -
 
         update_config(app.config["CONFIG_PATH"], mutate)
         flash(f"Stopped watching {name}.", "ok")
-        return redirect(url_for("exposure_page"))
+        return redirect(url_for("watchlist_page"))
+
+    @app.post("/rules/toggle")
+    def rule_toggle():
+        name, on = request.form.get("name", ""), request.form.get("on") == "1"
+
+        def mutate(raw):
+            for r in raw.get("alert_rules", []):
+                if r.get("name") == name:
+                    r["enabled"] = on
+
+        if not any(r["name"] == name for r in cfg()["alert_rules"]):
+            abort(404)
+        update_config(app.config["CONFIG_PATH"], mutate)
+        flash(f"Rule “{name}” is {'on' if on else 'off'}.", "ok")
+        return redirect(url_for("watchlist_page"))
 
     # -------------------------------------------------------- briefing
     @app.get("/briefing")
     def briefing_page():
         conf = cfg()
         b = queries.briefing(conn(), conf["alert_rules"], conf["sources"])
-        return render_template("briefing.html", nav="briefing", theme="editorial", b=b, bars=bar_chart(b["weeks"]))
+        return render_template("briefing.html", nav="today", b=b, bars=bar_chart(b["weeks"]))
 
     # --------------------------------------------------------- pipeline
     @app.get("/pipeline")
     def pipeline_page():
         p = queries.pipeline(conn(), cfg()["sources"])
-        return render_template("pipeline.html", nav="pipeline", theme="matrix", p=p)
+        return render_template("pipeline.html", nav="system", tab="sources", p=p)
+
+    @app.get("/system")
+    def system_page():
+        return redirect(url_for("pipeline_page"))
 
     # ------------------------------------------------------- CVE detail
     @app.get("/cve/<cve_id>")
     def cve_page(cve_id):
-        d = cve_detail(conn(), cve_id)
+        c, conf = conn(), cfg()
+        d = cve_detail(c, cve_id)
         if not d:
             abort(404)
-        return render_template("cve.html", nav="feed", d=d)
+        row = workflow.load_reviews(c).get(d["cve_id"])
+        st = workflow.state_of(row, d["cvss"], d["exploited"], datetime.now(timezone.utc))
+        return render_template(
+            "cve.html", nav="threats", d=d, st=st, watch=queries.watch_names(d, conf["watchlist"]),
+            alert=queries.alert_status(d, conf["alert_rules"]),
+            exploit_sources=sorted({a["source"] for a in d["articles"] if a["exploited"]}),
+            notes=workflow.notes_for(c, d["cve_id"]), events=workflow.history(c, d),
+            snoozes=[(k, v[0]) for k, v in workflow.SNOOZES.items()],
+            advisories=[a for a in d["articles"] if a["kind"] == "Vendor advisory"])
+
+    @app.post("/cve/<cve_id>/state")
+    def cve_state(cve_id):
+        action = request.form.get("action", "")
+        msg = workflow.decide(conn(), cve_id, "reviewed" if action == "dismiss" else action,
+                              snooze=request.form.get("snooze"))
+        if not msg:
+            abort(400, "That decision is not recognised.")
+        if action == "dismiss":
+            msg = f"Dismissed {cve_id.upper()}."
+        if action == "open":
+            flash(msg, "ok")
+        else:
+            session["undo"] = {"cve": cve_id.upper(), "text": msg}
+        return redirect(safe_next(url_for("cve_page", cve_id=cve_id)))
+
+    @app.post("/cve/<cve_id>/note")
+    def cve_note(cve_id):
+        if not cve_detail(conn(), cve_id):
+            abort(404)
+        if workflow.add_note(conn(), cve_id, request.form.get("text", "")):
+            flash("Note saved.", "ok")
+        else:
+            flash("Type a note first.", "error")
+        return redirect(url_for("cve_page", cve_id=cve_id) + "#decision")
 
     # ------------------------------------------------------------ runs
     @app.get("/runs")
@@ -203,7 +288,7 @@ def create_app(config_path: str = "config.yaml", with_scheduler: bool = False) -
         show = request.args.get("show", "All")
         kind = {"Scrapes": "Scrape", "Alerts": "Alert"}.get(show)
         rows = queries.list_runs(conn(), kind=kind, failures=(show == "Failures"))
-        return render_template("runs.html", nav="runs", rows=rows, show=show,
+        return render_template("runs.html", nav="system", tab="log", rows=rows, show=show,
                                tabs=["All", "Scrapes", "Alerts", "Failures"],
                                stats=queries.run_stats(conn()))
 
@@ -214,7 +299,7 @@ def create_app(config_path: str = "config.yaml", with_scheduler: bool = False) -
         c = conn()
         health = {h["name"]: h for h in queries.source_health(c, [s["name"] for s in conf["sources"]])}
         from .scheduler import next_run
-        return render_template("settings.html", nav="settings", conf=conf, health=health,
+        return render_template("settings.html", nav="system", tab="settings", conf=conf, health=health,
                                next_run=next_run(app.config["SCHEDULER"]),
                                has_scheduler=app.config["SCHEDULER"] is not None)
 
@@ -268,7 +353,7 @@ def create_app(config_path: str = "config.yaml", with_scheduler: bool = False) -
     def scrape_now():
         threading.Thread(target=lambda: run_cycle(cfg()), daemon=True).start()
         flash("Scrape started. Refresh the run log in a moment.", "ok")
-        return redirect(request.form.get("next") or url_for("runs"))
+        return redirect(safe_next(url_for("runs")))
 
     @app.post("/settings/test/<channel>")
     def test_channel(channel):
@@ -276,7 +361,7 @@ def create_app(config_path: str = "config.yaml", with_scheduler: bool = False) -
             abort(404)
         ok, msg = send_test(cfg(), channel)
         flash(f"{channel.title()} test: {msg}", "ok" if ok else "error")
-        return redirect(url_for("settings"))
+        return redirect(safe_next(url_for("settings")))
 
     # ------------------------------------------------------ rule editor
     def rule_from_form(f) -> dict:
@@ -335,8 +420,8 @@ def create_app(config_path: str = "config.yaml", with_scheduler: bool = False) -
                 update_config(app.config["CONFIG_PATH"],
                               lambda raw: raw.setdefault("alert_rules", []).append(rule))
                 flash(f"Rule '{rule['name']}' saved.", "ok")
-                return redirect(url_for("settings"))
-        return render_template("rule.html", nav="rules", rule=rule, sources=names,
+                return redirect(url_for("watchlist_page"))
+        return render_template("rule.html", nav="watch", rule=rule, sources=names,
                                channels=list(SENDERS), matches=matches, tested=bool(form),
                                match_count=len(preview(rule)) if form else 0)
 

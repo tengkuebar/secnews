@@ -1,0 +1,8 @@
+<div style="display:flex;flex-direction:column;gap:12px">
+  <h1>System</h1>
+  <nav class="tabs" aria-label="System sections">
+    <a href="{{ url_for('pipeline_page') }}" {% if tab == 'sources' %}class="on" aria-current="page"{% endif %}>Sources</a>
+    <a href="{{ url_for('runs') }}" {% if tab == 'log' %}class="on" aria-current="page"{% endif %}>Run log</a>
+    <a href="{{ url_for('settings') }}" {% if tab == 'settings' %}class="on" aria-current="page"{% endif %}>Settings</a>
+  </nav>
+</div>

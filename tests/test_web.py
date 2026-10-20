@@ -59,39 +59,63 @@ def test_sparkline_handles_all_zero():
     assert s["points"].count(",") == 8
 
 
-def test_triage_page_renders_with_matrix_theme(client):
-    r = client.get("/triage")
+def test_nav_has_four_pages_and_old_urls_redirect(client):
+    html = client.get("/").get_data(as_text=True)
+    nav = re.search(r'<nav class="main".*?</nav>', html, re.S).group(0)
+    assert re.findall(r">([^<]+)</a>", nav) == ["Today", "Threats", "Watchlist and alerts", "System"]
+    assert "fonts.googleapis" not in html
+    for old, new in (("/triage", "/"), ("/exposure", "/watchlist")):
+        r = client.get(old)
+        assert r.status_code == 301 and r.headers["Location"].endswith(new)
+
+
+def test_theme_toggle_is_wired_and_csp_allows_the_script(client):
+    r = client.get("/")
     html = r.get_data(as_text=True)
-    assert r.status_code == 200 and 'class="matrix"' in html
-    assert "work queue" in html and 'href="/triage"' in html
-    assert "fonts.googleapis" not in html          # fonts are self-hosted now
+    assert 'id="theme-toggle"' in html and "/static/theme.js" in html and 'class="bulb"' in html
+    assert "script-src" not in r.headers["Content-Security-Policy"]          # falls back to 'self'
+    assert "<script>" not in html                                           # no inline script
+    js = client.get("/static/theme.js").get_data(as_text=True)
+    assert "data-theme" in js and "localStorage" in js
+    css = client.get("/static/style.css").get_data(as_text=True)
+    assert ':root[data-theme="dark"]' in css and ':root:not([data-theme="light"])' in css
 
 
 def test_pipeline_page_renders(client):
     r = client.get("/pipeline")
     html = r.get_data(as_text=True)
-    assert r.status_code == 200 and 'class="matrix"' in html
-    assert "sources healthy" in html and "who reports first" in html and "Source A" in html
+    assert r.status_code == 200 and 'aria-current="page"' in html
+    assert "Sources healthy" in html and "Who reports first" in html and "Source A" in html
+    for tab in ("Sources", "Run log", "Settings"):
+        assert f">{tab}</a>" in html
 
 
 def watch(app):
     return yaml.safe_load(app.cfg_path.read_text(encoding="utf-8")).get("watchlist", [])
 
 
-def test_exposure_page_empty_state_then_add_and_remove(client, app):
-    html = client.get("/exposure").get_data(as_text=True)
-    assert 'class="bento"' in html and "Nothing to check yet" in html and "Add what you run" in html
-    t = token(client, "/exposure")
+def test_watchlist_page_empty_state_then_add_and_remove(client, app):
+    html = client.get("/watchlist").get_data(as_text=True)
+    assert "Empty. Add a product below" in html
+    t = token(client, "/watchlist")
     r = client.post("/exposure/add", data={"csrf": t, "name": "Acme Gateway", "terms": "Acme GW, AcmeOS"})
     assert r.status_code == 302 and watch(app) == [{"name": "Acme Gateway", "match": ["Acme GW", "AcmeOS"]}]
-    html = client.get("/exposure").get_data(as_text=True)
-    assert "1 of 1" in html and "Acme Gateway" in html and "Critical, 1 match" in html
+    html = client.get("/watchlist").get_data(as_text=True)
+    assert "1 product" in html and "Acme Gateway" in html and "Critical, 1 match" in html
     r = client.post("/exposure/remove", data={"csrf": t, "name": "Acme Gateway"})
     assert r.status_code == 302 and watch(app) == []
 
 
+def test_rule_toggle_writes_config(client, app):
+    t = token(client, "/watchlist")
+    assert client.post("/rules/toggle", data={"csrf": t, "name": "Crit", "on": "0"}).status_code == 302
+    assert yaml.safe_load(app.cfg_path.read_text(encoding="utf-8"))["alert_rules"][0]["enabled"] is False
+    assert "No alert rule is on" in client.get("/watchlist").get_data(as_text=True)
+    assert client.post("/rules/toggle", data={"csrf": t, "name": "Nope", "on": "1"}).status_code == 404
+
+
 def test_exposure_add_validation(client, app):
-    t = token(client, "/exposure")
+    t = token(client, "/watchlist")
     client.post("/exposure/add", data={"csrf": t, "name": "Acme Gateway"})
     for data in ({"name": "ab"}, {"name": "x" * 61}, {"name": "acme gateway"},          # too short, too long, duplicate
                  {"name": "Fine Name", "terms": "ok term, no"}):                          # an extra term under 3 characters
@@ -107,55 +131,80 @@ def test_exposure_posts_need_the_form_token(client):
 def test_briefing_page_renders(client):
     r = client.get("/briefing")
     html = r.get_data(as_text=True)
-    assert r.status_code == 200 and 'class="editorial"' in html
+    assert r.status_code == 200
     assert "The week in vulnerabilities" in html and "The one to act on" in html and "What changed" in html
 
 
-def test_feed_excerpt_ends_at_a_word_with_ellipsis(app, client):
-    from secnews.config import load_config
-    conn = db.init_db(load_config(app.cfg_path)["database"])
-    conn.execute("INSERT INTO articles(source,url,title,summary,content_hash,scraped_at) VALUES "
-                 "('Source A','https://x/long','Long one',?,'hh2','2026-10-08T00:00:00Z')", ("word " * 80,))
-    conn.commit()
-    conn.close()
-    html = client.get("/?q=Long+one").get_data(as_text=True)
-    assert "word…" in html and "wor…" not in html
-
-
 def test_self_hosted_fonts_are_served(client):
-    assert client.get("/static/fonts/space-mono-latin-400-normal.woff2").status_code == 200
+    assert client.get("/static/fonts/ibm-plex-mono-latin-400-normal.woff2").status_code == 200
     assert client.get("/static/fonts/ibm-plex-sans-latin-500-normal.woff2").status_code == 200
 
 
-def test_feed_renders_and_shows_seen_badge(client):
-    html = client.get("/").get_data(as_text=True)
-    assert "Acme Gateway" in html and "Seen in 2 sources" in html
-    assert "CVE-2026-0001" in html
+def test_threats_lists_one_row_per_cve_ranked_critical_first(client):
+    html = client.get("/threats").get_data(as_text=True)
+    assert html.count("CVE-2026-0001") >= 1 and html.count('class="chipcve">CVE-2026-0001') == 1   # deduped across sources
+    assert "2 sources" in html
+    assert html.index("CVE-2026-0001") < html.index("CVE-2026-0002")
 
 
-def test_feed_filters(client):
-    assert "Widget Server" not in client.get("/?severity=Critical").get_data(as_text=True)
-    assert "Widget Server" in client.get("/?severity=Medium").get_data(as_text=True)
-    assert "Weekly roundup" in client.get("/?source=Source+A").get_data(as_text=True)
-    assert "Weekly roundup" not in client.get("/?source=Source+B").get_data(as_text=True)
-    assert "No articles match" in client.get("/?q=zzzznothing").get_data(as_text=True)
+def test_threats_filters(client):
+    assert "CVE-2026-0002" not in client.get("/threats?severity=Critical").get_data(as_text=True)
+    assert "CVE-2026-0002" in client.get("/threats?severity=Medium").get_data(as_text=True)
+    assert "No CVE matches" in client.get("/threats?q=zzzznothing").get_data(as_text=True)
+    assert "CVE-2026-0001" in client.get("/threats?q=0001").get_data(as_text=True)
+    assert "CVE-2026-0001" not in client.get("/threats?watch=1").get_data(as_text=True)    # empty watchlist
 
 
-def test_feed_out_of_range_page_redirects(client):
-    r = client.get("/?page=99")
-    assert r.status_code == 302
-
-
-def test_feed_is_ranked_critical_first(client):
-    html = client.get("/").get_data(as_text=True)
-    assert html.index("Critical flaw in Acme") < html.index("Two bugs patched")
+def test_threats_out_of_range_page_is_clamped_and_bad_filters_ignored(client):
+    assert client.get("/threats?page=99").status_code == 200
+    assert client.get("/threats?state=bogus&severity=bogus").status_code == 200
 
 
 def test_cve_page_shows_conflict(client):
     html = client.get("/cve/CVE-2026-0001").get_data(as_text=True)
     assert "Sources disagree on the score: 9.8 vs 7.5" in html
     assert "2 articles across 2 sources" in html
+    assert "Needs attention" in html and "https://nvd.nist.gov/vuln/detail/CVE-2026-0001" in html
     assert client.get("/cve/CVE-2000-0000").status_code == 404
+
+
+def test_today_with_empty_watchlist_prompts_and_shows_exploited_critical(client):
+    html = client.get("/").get_data(as_text=True)
+    assert "Tell secnews what you run" in html and "Worth a look, not on your watchlist" in html
+    assert "CVE-2026-0001" in html
+
+
+def test_review_snooze_undo_and_reopen_flow(client):
+    t = token(client, "/")
+    r = client.post("/cve/CVE-2026-0001/state", data={"csrf": t, "action": "reviewed", "next": "/"})
+    assert r.status_code == 302 and r.headers["Location"] == "/"
+    html = client.get("/").get_data(as_text=True)
+    assert "Marked CVE-2026-0001 as reviewed." in html and ">Undo</button>" in html
+    assert "Worth a look, not on your watchlist" not in html                       # it left Today
+    assert "Reviewed" in client.get("/threats?state=reviewed").get_data(as_text=True)
+    client.post("/cve/CVE-2026-0001/state", data={"csrf": t, "action": "open", "next": "/"})
+    assert "Worth a look, not on your watchlist" in client.get("/").get_data(as_text=True)
+
+
+def test_decision_posts_validate_input_and_stay_on_site(client):
+    t = token(client, "/")
+    assert client.post("/cve/CVE-2026-0001/state", data={"csrf": t, "action": "nope"}).status_code == 400
+    assert client.post("/cve/CVE-2026-0001/state", data={"csrf": t, "action": "snoozed", "snooze": "9"}).status_code == 400
+    assert client.post("/cve/CVE-2000-0000/state", data={"csrf": t, "action": "reviewed"}).status_code == 400
+    r = client.post("/cve/CVE-2026-0001/state", data={"csrf": t, "action": "reviewed", "next": "https://evil.example/"})
+    assert r.headers["Location"].endswith("/cve/CVE-2026-0001")
+    r = client.post("/cve/CVE-2026-0001/state", data={"csrf": t, "action": "reviewed", "next": "//evil.example"})
+    assert r.headers["Location"].endswith("/cve/CVE-2026-0001")
+    assert client.post("/cve/CVE-2026-0001/state", data={"action": "reviewed"}).status_code == 400   # no token
+
+
+def test_notes_are_saved_escaped_and_shown_in_history(client):
+    t = token(client, "/cve/CVE-2026-0001")
+    assert client.post("/cve/CVE-2026-0001/note", data={"csrf": t, "text": "  "}).status_code == 302
+    client.post("/cve/CVE-2026-0001/note", data={"csrf": t, "text": "patched <b>staging</b>"})
+    html = client.get("/cve/CVE-2026-0001").get_data(as_text=True)
+    assert "patched &lt;b&gt;staging&lt;/b&gt;" in html and "You added a note." in html
+    assert client.post("/cve/CVE-2000-0000/note", data={"csrf": t, "text": "x"}).status_code == 404
 
 
 def test_runs_page_and_filter(client):
@@ -223,5 +272,10 @@ def test_xss_in_title_is_escaped(app, client):
                  "('Source A','https://x/1','<script>alert(1)</script>','hh','2026-10-08T00:00:00Z')")
     conn.commit()
     conn.close()
-    html = client.get("/").get_data(as_text=True)
+    conn = db.init_db(load_config(app.cfg_path)["database"])
+    conn.execute("INSERT INTO cves(cve_id,article_id,cvss) VALUES ('CVE-2026-9999', (SELECT id FROM articles WHERE url='https://x/1'), 9.9)")
+    conn.commit()
+    conn.close()
+    html = client.get("/cve/CVE-2026-9999").get_data(as_text=True)
     assert "<script>alert(1)</script>" not in html and "&lt;script&gt;" in html
+    assert "&lt;script&gt;" in client.get("/threats").get_data(as_text=True)

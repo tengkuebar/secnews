@@ -56,6 +56,33 @@ CREATE TABLE IF NOT EXISTS runs (
     detail     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_runs_started ON runs(started_at);
+
+-- One row per CVE the user has decided on. base_* is the score and exploitation status at that moment,
+-- so a later rise can bring the CVE back to Today.
+CREATE TABLE IF NOT EXISTS reviews (
+    cve_id          TEXT PRIMARY KEY,
+    status          TEXT NOT NULL,          -- 'reviewed' or 'snoozed'
+    until           TEXT,                   -- snooze end; NULL means "until the score changes"
+    base_cvss       REAL,
+    base_exploited  INTEGER NOT NULL DEFAULT 0,
+    updated_at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS cve_notes (
+    id         INTEGER PRIMARY KEY,
+    cve_id     TEXT NOT NULL,
+    text       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notes_cve ON cve_notes(cve_id);
+
+CREATE TABLE IF NOT EXISTS cve_events (
+    id      INTEGER PRIMARY KEY,
+    cve_id  TEXT NOT NULL,
+    at      TEXT NOT NULL,
+    text    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_events_cve ON cve_events(cve_id);
 """
 
 

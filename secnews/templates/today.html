@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Today{% endblock %}
+{% block body %}
+<div class="head">
+  <div style="display:flex;flex-direction:column;gap:4px">
+    <h1>Today</h1>
+    <span class="sub">{{ today_label }} · what needs a decision, from the products you watch</span>
+  </div>
+  <div class="row sub">
+    <span class="mono">Last scrape: {{ (last_run|short) or 'never' }}</span>
+    <form method="post" action="{{ url_for('scrape_now') }}" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('today_page') }}">
+      <button class="primary">Scrape now</button>
+    </form>
+  </div>
+</div>
+
+<div class="grid4">
+  <div class="card tile"><span class="sub">Need attention</span><span class="v">{{ t.need_n }}</span><span class="sub">{{ t.reviewed_today }} reviewed today</span></div>
+  <div class="card tile"><span class="sub">Reported as exploited</span><span class="v {{ 'bad' if t.exploited_week }}">{{ t.exploited_week }}</span><span class="sub">first seen this week, all CVEs</span></div>
+  <div class="card tile"><span class="sub">Alert rules on</span><span class="v {{ 'bad' if not t.rules_on }}">{{ t.rules_on }}</span><span class="sub"><a href="{{ url_for('watchlist_page') }}">{{ 'Manage rules' if t.rules_on else 'Turn one on' }}</a></span></div>
+  <div class="card tile"><span class="sub">News feeds working</span><span class="v {{ 'good' if t.feeds_ok == t.feeds_active else 'bad' }}">{{ t.feeds_ok }} / {{ t.feeds_active }}</span><span class="sub"><a href="{{ url_for('pipeline_page') }}">See the system</a></span></div>
+</div>
+
+<div class="cols">
+<div class="main-col">
+  {% if not t.watching %}
+  <div class="note"><strong>Tell secnews what you run.</strong><br>
+  Today shows the CVEs that mention products on your watchlist. Your watchlist is empty, so only the critical, exploited ones appear below.
+  <a href="{{ url_for('watchlist_page') }}">Add a product</a>.</div>
+  {% endif %}
+
+  {% if t.all_clear %}
+  <div class="card" style="padding:36px 24px">
+    <span style="font-size:18px;font-weight:600">All clear for now.</span>
+    <span class="sub" style="font-size:14px;line-height:1.5;max-width:56ch">Nothing {{ 'on your watchlist ' if t.watching }}needs a decision. Anything that changes will appear here again. <a href="{{ url_for('threats_page') }}">See every CVE</a>.</span>
+  </div>
+  {% endif %}
+
+  {% if t.decisions %}
+  <div class="card flush">
+    <div class="listhead"><b style="font-size:15px;color:var(--ink)">On your watchlist</b><span>Worst first</span></div>
+    {% for i in t.decisions %}
+    <div class="item">
+      <div class="sevcol"><span class="badge sev-{{ i.severity }}">{{ i.severity }}</span>
+        <span class="mono sub" style="font-size:12px">{{ 'CVSS ' ~ i.cvss if i.cvss is not none else 'no score' }}</span></div>
+      <div class="body">
+        <a class="t plain" href="{{ url_for('cve_page', cve_id=i.cve_id) }}">{{ i.title }}</a>
+        <div class="row" style="gap:6px">
+          <span class="chipcve">{{ i.cve_id }}</span><span class="tag watch">{{ i.product }}</span>
+          {% for text, hot in i.reasons %}<span class="tag {{ 'hot' if hot }}">{{ text }}</span>{% endfor %}
+        </div>
+        {% with cve_id=i.cve_id, next=url_for('today_page') %}{% include "_decision.html" %}{% endwith %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if t.worth %}
+  <div class="card flush">
+    <div class="listhead" style="flex-direction:column;gap:2px"><b style="font-size:15px;color:var(--ink)">Worth a look, not on your watchlist</b>
+      <span>Critical and reported as exploited. If you run one, add the product to your watchlist.</span></div>
+    {% for i in t.worth %}
+    <div class="item" style="align-items:center">
+      <div class="sevcol"><span class="badge sev-{{ i.severity }}">{{ i.severity }}</span><span class="mono sub" style="font-size:12px">CVSS {{ i.cvss }}</span></div>
+      <div class="body" style="flex-basis:260px;gap:4px">
+        <a class="t plain" href="{{ url_for('cve_page', cve_id=i.cve_id) }}">{{ i.title }}</a>
+        <span class="sub"><span class="chipcve">{{ i.cve_id }}</span> Exploited, {{ i.sources }} source{{ '' if i.sources == 1 else 's' }}</span>
+      </div>
+      {% with cve_id=i.cve_id, next=url_for('today_page'), dismiss=True %}{% include "_decision.html" %}{% endwith %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="side-col">
+  <div class="card">
+    <div class="head"><h3>New CVEs per week</h3><span class="mono" style="font-size:13px">{{ week_count }} this week</span></div>
+    <svg viewBox="0 0 {{ spark.w }} {{ spark.h }}" role="img" aria-label="Unique CVEs first seen per week over the last 8 weeks, {{ week_count }} this week" style="width:100%;height:auto;display:block">
+      <line x1="0" y1="{{ spark.h - 2 }}" x2="{{ spark.w }}" y2="{{ spark.h - 2 }}" style="stroke:var(--line)" stroke-width="1"/>
+      <polyline points="{{ spark.points }}" fill="none" style="stroke:var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="{{ spark.last[0] - 2 }}" cy="{{ spark.last[1] }}" r="3.5" style="fill:var(--accent)"/>
+    </svg>
+    <div class="head sub" style="font-size:12px"><span>8 weeks ago</span><span>This week</span></div>
+    <a href="{{ url_for('briefing_page') }}" style="min-height:44px;display:inline-flex;align-items:center;font-weight:500">Read the weekly briefing</a>
+  </div>
+  <div class="card" style="gap:6px">
+    <h3>Your queue</h3>
+    <span>Snoozed: <b class="mono">{{ t.snoozed_n }}</b> · Reviewed today: <b class="mono">{{ t.reviewed_today }}</b></span>
+    <a href="{{ url_for('threats_page') }}" style="min-height:44px;display:inline-flex;align-items:center;font-weight:500">See every CVE</a>
+  </div>
+  <div class="card" style="gap:6px">
+    <h3>Official scores (NVD)</h3>
+    <span class="sub" style="line-height:1.5">Off. Scores come from what news articles and vendor advisories quote. Fetching NVD scores would fill the gaps, and needs a setting that does not exist yet.</span>
+  </div>
+</div>
+</div>
+{% endblock %}

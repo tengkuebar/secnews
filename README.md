@@ -27,9 +27,18 @@ Before you scrape regularly, put a real contact address in `fetching.user_agent`
 | `serve [--port N] [--no-scheduler]` | Dashboard and scheduler |
 | `schedule` | Scheduler only, no web UI |
 
-The dashboard has nine pages: Triage (one row per CVE, ranked, with alert status; Matrix style), My exposure (your watchlist against recent CVEs; Bento style), Briefing (a weekly read; Editorial style), Pipeline (source health and alert delivery; Matrix style), Feed, CVE detail, Run log, Alert rules and Settings.
+The dashboard has four pages, in one light and dark theme that follows your system setting:
 
-**Watchlist.** Add the products you run on the My exposure page (they are saved under `watchlist:` in `config.yaml`). A product matches a CVE when its name, or an extra term you give it, appears as a whole word in the CVE's headlines, summaries or affected phrase. In an article that names more than 3 CVEs, only the text within 200 characters of the CVE's ID counts. Each match shows the text it matched on. Treat a match as a hint: it does not know which version you run. The briefing's sentences are generated from stored data only. Excerpts are cut at a word boundary and end with an ellipsis. Fonts are bundled in `secnews/static/fonts`, so nothing loads from an external site. It binds to `127.0.0.1` only. There are no user accounts, so do not expose it to a network.
+- **Today**: what needs a decision. CVEs that match your watchlist, then critical exploited ones that do not. Each can be marked Reviewed or snoozed (1 day, 3 days, 1 week, or until the score changes), with an Undo bar.
+- **Threats**: every CVE from the last 30 days, one row each, with state tabs, severity chips, search and a watchlist filter, 10 per page.
+- **Watchlist and alerts**: the products you run, alert rules (on/off), and whether each alert channel's secret is set.
+- **System**: Sources (health, who reports first, alert delivery), Run log, and Settings.
+
+Opening a CVE shows each source's score, your decision buttons, notes (kept in the local database), and what happened to it. The weekly briefing is linked from Today.
+
+A reviewed or snoozed CVE leaves Today and comes back by itself if its score rises or exploitation is first reported (a snooze also ends on time). Scores are the ones quoted by articles and advisories. Official NVD scores are not fetched.
+
+**Watchlist.** Add the products you run on the Watchlist and alerts page (they are saved under `watchlist:` in `config.yaml`). A product matches a CVE when its name, or an extra term you give it, appears as a whole word in the CVE's headlines, summaries or affected phrase. In an article that names more than 3 CVEs, only the text within 200 characters of the CVE's ID counts. Each match shows the text it matched on. Treat a match as a hint: it does not know which version you run. The briefing's sentences are generated from stored data only. Excerpts are cut at a word boundary and end with an ellipsis. Fonts are bundled in `secnews/static/fonts`, so nothing loads from an external site. It binds to `127.0.0.1` only. There are no user accounts, so do not expose it to a network.
 
 ## How the data is handled
 

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Watchlist and alerts{% endblock %}
+{% block body %}
+<div style="display:flex;flex-direction:column;gap:4px">
+  <h1>Watchlist and alerts</h1>
+  <span class="sub">Tell secnews what you run, and who should be told. Today uses your watchlist to decide what needs attention.</span>
+</div>
+
+{% if not rules_on %}<div class="note"><strong>No alert rule is on.</strong> Nobody is told about a new critical CVE. Turn one on below.</div>{% endif %}
+
+<div class="cols">
+<section class="card half" aria-label="Watchlist" style="padding:18px 20px;gap:4px">
+  <div class="head"><h2>What you run</h2><span class="sub">{{ x.total }} product{{ '' if x.total == 1 else 's' }}</span></div>
+  <p class="sub" style="margin:0 0 8px;line-height:1.5">A product matches a CVE when its name appears as a whole word in the headline or summary. A match is a hint, not proof you run an affected version.</p>
+  {% for p in x.products %}
+  <div class="prow">
+    <span style="font-size:15px;font-weight:500;overflow-wrap:anywhere">{{ p.name }}{% if p.exploited %} <span class="tag hot">exploitation reported</span>{% endif %}<br>
+      <span class="sub" style="font-size:12px;font-weight:400">Matches: {{ p.terms|join(', ') }}</span></span>
+    <span style="font-size:13px;font-weight:600" class="tone-{{ p.tone }}">{% if p.level == 'Quiet' %}Quiet for {{ x.days }} days{% elif p.level == 'Unrated' %}{{ p.hits|length }} match{{ '' if p.hits|length == 1 else 'es' }}, no score{% else %}{{ p.level }}, {{ p.hits|length }} match{{ '' if p.hits|length == 1 else 'es' }}{% endif %}</span>
+    <form method="post" action="{{ url_for('exposure_remove') }}" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="name" value="{{ p.name }}">
+      <button class="xbtn" aria-label="Stop watching {{ p.name }}" title="Stop watching">×</button>
+    </form>
+  </div>
+  {% else %}<span class="sub" style="padding:8px 0;font-size:14px">Empty. Add a product below, and Today will start matching.</span>{% endfor %}
+  <form method="post" action="{{ url_for('exposure_add') }}" style="border-top:1px solid var(--line);margin-top:8px;padding-top:14px;display:flex;flex-direction:column;gap:10px">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <h3 style="font-size:14px">Add a product</h3>
+    <div class="row" style="align-items:flex-end;gap:10px">
+      <label class="f" style="flex:1 1 200px">Name as outlets write it<input type="text" name="name" maxlength="60" required placeholder="Fortinet FortiGate"></label>
+      <label class="f" style="flex:1 1 200px">Other spellings, comma separated<input type="text" name="terms" placeholder="FortiOS, FortiManager"></label>
+      <button class="primary" type="submit">Add</button>
+    </div>
+    <span class="sub">Names need at least 3 characters and match whole words.</span>
+  </form>
+</section>
+
+<div class="half" style="display:flex;flex-direction:column;gap:20px">
+  <section class="card" aria-label="Alert rules" style="padding:18px 20px;gap:4px">
+    <div class="head"><h2>Alert rules</h2><span class="sub">One alert per CVE, per rule</span></div>
+    {% for r in rules %}
+    <div class="kv" style="align-items:center">
+      <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:15px;font-weight:500">{{ r.name }}</span>
+        <span class="mono sub" style="font-size:12px">{% if r.min_cvss %}cvss ≥ {{ r.min_cvss }} {% endif %}{% if r.keywords %}keywords: {{ r.keywords|join(', ') }}{% endif %}</span>
+        <span class="sub" style="font-size:12px">Sends to {{ r.channels|join(', ') }}</span></span>
+      <form method="post" action="{{ url_for('rule_toggle') }}" style="margin:0">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="name" value="{{ r.name }}">
+        {% set on = r.enabled is not defined or r.enabled %}
+        <input type="hidden" name="on" value="{{ 0 if on else 1 }}">
+        <button class="btn {{ 'primary' if on }}" aria-label="{{ r.name }} is {{ 'on' if on else 'off' }}. {{ 'Turn off' if on else 'Turn on' }}">{{ 'On' if on else 'Off' }}</button>
+      </form>
+    </div>
+    {% else %}<span class="sub">No rules yet.</span>{% endfor %}
+    <div><a class="btn outline" href="{{ url_for('rule_new') }}">Add a rule</a></div>
+  </section>
+
+  <section class="card" aria-label="Channels" style="padding:18px 20px;gap:4px">
+    <div><h2>Where alerts go</h2><div class="sub" style="margin-top:2px">Secrets are never stored here. Each channel reads its secret from an environment variable on this PC.</div></div>
+    {% for c in channels %}
+    <div class="kv">
+      <span style="display:flex;flex-direction:column"><span style="font-size:15px;font-weight:500">{{ c.name }}</span><span class="mono sub" style="font-size:12px">{{ c.env }}</span>
+        <span style="font-size:12px;font-weight:600" class="{{ 'tone-ok' if c.ok else 'tone-bad' }}">{{ 'Ready' if c.ok else 'Not set on this PC' }}</span></span>
+      <form method="post" action="{{ url_for('test_channel', channel=c.key) }}" style="margin:0">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('watchlist_page') }}">
+        <button class="btn">Send test</button>
+      </form>
+    </div>
+    {% endfor %}
+    <a href="{{ url_for('settings') }}">Change channel settings</a>
+  </section>
+</div>
+</div>
+
+{% if x.matches %}
+<section class="card flush" aria-label="What matches">
+  <div class="listhead"><h2 style="color:var(--ink)">What matches your watchlist</h2><span>Top {{ x.matches|length }} of {{ x.match_total }}, last {{ x.days }} days</span></div>
+  {% for m in x.matches %}
+  <div class="item" style="gap:6px 14px">
+    <div class="sevcol"><span class="badge sev-{{ m.severity }}">{{ m.severity }}</span><span class="mono sub" style="font-size:12px">{{ 'CVSS ' ~ m.cvss if m.cvss is not none else 'no score' }}</span></div>
+    <div class="body" style="gap:4px">
+      <a class="t plain" href="{{ url_for('cve_page', cve_id=m.cve_id) }}">{{ m.title }}</a>
+      <span class="sub"><b>{{ m.product }}</b> · <span class="chipcve">{{ m.cve_id }}</span> · {{ m.sources }} source{{ '' if m.sources == 1 else 's' }}{% if m.exploited %} · <b class="tone-bad">exploitation reported</b>{% endif %} · {{ m.alert }}</span>
+      {% for w in m.why %}<span class="sub" style="line-height:1.45">Matched “{{ w.matched }}”: …{{ w.snippet }}…</span>{% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Automation settings{% endblock %}
 {% block body %}
+{% include "_systemtabs.html" %}
 <form method="post" action="{{ url_for('settings_save') }}" style="display:flex;flex-direction:column;gap:20px">
 <input type="hidden" name="csrf" value="{{ csrf_token() }}">
 <div class="head">
-  <div><h1>Automation settings</h1><div class="sub">Controls what runs, when, and who gets told. Saved to config.yaml.</div></div>
+  <div class="sub">Controls what runs, when, and who gets told. Saved to config.yaml.</div>
   <div class="row">
     <button class="primary" type="submit">Save settings</button>
     <button type="submit" class="outline" formaction="{{ url_for('scrape_now') }}">Run scrape now</button>
@@ -44,6 +45,7 @@
       <label class="check"><input type="checkbox" name="rule" value="{{ r.name }}" {{ 'checked' if r.enabled is not defined or r.enabled }} aria-label="{{ r.name }} enabled"> On</label></div>
     {% endfor %}
     <a class="btn outline" href="{{ url_for('rule_new') }}">Add rule</a>
+    <span class="sub">Rules also have on/off buttons on <a href="{{ url_for('watchlist_page') }}">Watchlist and alerts</a>.</span>
   </div>
 </div>
 
@@ -55,6 +57,7 @@
       <label class="f">Email: recipient<input type="text" name="email_to" value="{{ conf.channels.email.to or '' }}"></label>
       <label class="f">SMTP password variable<input type="text" class="mono" name="smtp_password_env" value="{{ conf.channels.email.password_env or '' }}"></label>
       <button type="submit" formaction="{{ url_for('test_channel', channel='email') }}">Send test email</button>
+      <input type="hidden" name="next" value="{{ url_for('settings') }}">
     </div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <label class="f">Slack: webhook variable<input type="text" class="mono" name="slack_env" value="{{ conf.channels.slack.webhook_env or '' }}"></label>

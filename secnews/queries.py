@@ -308,10 +308,19 @@ def _term_regex(terms):
     return re.compile("|".join(r"(?<![a-z0-9])" + re.escape(t) + r"(?![a-z0-9])" for t in terms), re.IGNORECASE)
 
 
-def exposure(conn, watchlist, rules, sources, now=None, days=30):
-    """Which watched products have matching CVEs, worst first. Matching is by name in text, so it is a hint."""
+def watch_names(detail, watchlist):
+    """Names of watchlist products that one CVE's text mentions (a hint, not proof)."""
+    hay = _haystack(detail)
+    return [w["name"] for w in watchlist if watch_terms(w) and _term_regex(watch_terms(w)).search(hay)]
+
+
+def exposure(conn, watchlist, rules, sources, now=None, days=30, t=None):
+    """Which watched products have matching CVEs, worst first. Matching is by name in text, so it is a hint.
+
+    Pass `t` (a triage result covering at least `days`) to avoid computing it twice.
+    """
     now = now or datetime.now(timezone.utc)
-    t = triage(conn, rules, now=now, queue_days=days, limit=100000)
+    t = t or triage(conn, rules, now=now, queue_days=days, limit=100000)
     products = []
     for w in watchlist:
         terms = watch_terms(w)
@@ -349,7 +358,7 @@ def exposure(conn, watchlist, rules, sources, now=None, days=30):
     return {
         "products": products, "severe": len(severe), "total": len(products),
         "quiet": sum(1 for p in products if p["level"] == "Quiet"),
-        "matches": matches[:8], "match_total": len(matches),
+        "matches": matches[:8], "match_total": len(matches), "by_cve": by_cve,
         "feeds_ok": pipe["healthy"], "feeds_active": pipe["active"], "days": days,
     }
 
