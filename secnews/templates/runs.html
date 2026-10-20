@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Run log{% endblock %}
+{% block body %}
+<div class="head">
+  <div><h1>Run log</h1><div class="sub">Every scrape and every alert, so a broken feed never hides behind a quiet news day.</div></div>
+  <form method="post" action="{{ url_for('scrape_now') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <button class="primary">Run scrape now</button>
+  </form>
+</div>
+<div class="grid4">
+  <div class="card tile"><span class="sub">Scrapes, last 24h</span><span class="v">{{ stats.scrapes_24h }}</span></div>
+  <div class="card tile"><span class="sub">Failed runs, last 24h</span><span class="v">{{ stats.failed_24h }}</span></div>
+  <div class="card tile"><span class="sub">Alerts sent, last 24h</span><span class="v">{{ stats.alerts_24h }}</span></div>
+  <div class="card tile"><span class="sub">Last successful scrape</span><span class="v" style="font-size:20px">{{ (stats.last_ok|short) or 'never' }}</span></div>
+</div>
+<div class="card row"><span class="sub" style="margin-right:4px">Show</span>
+  {% for t in tabs %}<a class="chip {{ 'on' if show == t }}" href="{{ url_for('runs', show=t) }}">{{ t }}</a>{% endfor %}
+</div>
+<div class="card flush table">
+  <div class="tr th"><span>Time (UTC)</span><span>Source or rule</span><span>Type</span><span>Result</span><span>Status</span></div>
+  {% for r in rows %}
+  <div class="tr">
+    <span class="mono" style="font-size:13px">{{ r.started_at|short }}</span>
+    <span>{{ r.source }}</span>
+    <span class="sub">{{ r.kind }}</span>
+    <span class="sub">{% if r.status == 'Failed' %}{{ r.error }}{% if r.retries %} ({{ r.retries }} retries){% endif %}{% elif r.kind == 'Alert' %}{{ r.detail }}{% else %}{{ r.fetched }} fetched, {{ r.new }} new{% if r.error %}; {{ r.error }}{% endif %}{% endif %}</span>
+    <span class="badge {{ r.status|lower }}">{{ r.status }}</span>
+  </div>
+  {% else %}<div class="empty">Nothing to show for this filter.</div>{% endfor %}
+</div>
+{% endblock %}

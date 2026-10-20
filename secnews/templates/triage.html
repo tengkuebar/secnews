@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Triage{% endblock %}
+{% macro bar(n, total, color) %}{% if total %}<span style="width:{{ (n * 100 / total)|round(1) }}%;background:{{ color }}"></span>{% endif %}{% endmacro %}
+{% block body %}
+<div class="head">
+  <div><h1 style="font-size:20px">triage<span style="color:#4FD1A5">_</span></h1>
+    <div class="sub">What needs a decision. One row per CVE, first seen in the last {{ t.queue_days }} days.</div></div>
+  <form method="post" action="{{ url_for('scrape_now') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('triage_page') }}">
+    <button class="primary" style="color:#04130D;font-family:inherit;font-weight:700;border-radius:2px">scrape now</button>
+  </form>
+</div>
+
+<section aria-label="Needs a decision" class="mx-kpis">
+  <div class="mx-kpi"><span class="l">critical, last {{ t.kpi_days }} days</span><span class="v tone-bad">{{ t.kpis.critical }}</span><span class="d">Score 9.0 or higher, as shown on the CVE page</span></div>
+  <div class="mx-kpi"><span class="l">exploitation reported</span><span class="v tone-wait">{{ t.kpis.exploited }}</span><span class="d">At least one article says it is being used in attacks</span></div>
+  <div class="mx-kpi"><span class="l">sources disagree</span><span class="v">{{ t.kpis.disagree }}</span><span class="d">Quoted scores differ by 1.0 or more</span></div>
+  <div class="mx-kpi"><span class="l">critical, nobody told</span><span class="v {{ 'tone-bad' if t.kpis.critical_unalerted else 'tone-ok' }}">{{ t.kpis.critical_unalerted }}</span><span class="d">No alert has gone out for them</span></div>
+</section>
+
+<div class="mx-cols">
+  <section class="mx-main" aria-label="Work queue">
+    <h2 class="mx-h">work queue, ranked by score, then exploitation, then sources</h2>
+    <div class="mx-box">
+      <div class="mx-row mx-head" style="border-top:0"><span>score</span><span>threat and why it ranks here</span><span>coverage</span><span>alert</span></div>
+      {% for q in t.queue %}
+      <a class="mx-row" href="{{ url_for('cve_page', cve_id=q.cve_id) }}">
+        <span class="mx-score sc-{{ q.severity }}">{{ q.cvss if q.cvss is not none else '–' }}</span>
+        <span>
+          <span class="mx-title">{{ q.title }}</span>
+          <div class="mx-sub">{{ q.cve_id }}
+            {% if q.exploited %} · <span class="tone-wait">exploitation reported</span>{% endif %}
+            {% if q.conflict %} · <span class="tone-wait">scores {{ q.conflict|join(' vs ') }}</span>{% endif %}
+            {% if q.cvss is none %} · no score published yet{% endif %}</div>
+        </span>
+        <span>{{ q.sources }} source{{ '' if q.sources == 1 else 's' }}</span>
+        <span class="tone-{{ q.alert_tone }}">{{ q.alert }}</span>
+      </a>
+      {% else %}
+      <div class="mx-empty">No CVEs found in the last {{ t.queue_days }} days. Run a scrape, or check the run log if sources are failing.</div>
+      {% endfor %}
+    </div>
+    {% if t.total > t.queue|length %}<div class="sub">Showing the top {{ t.queue|length }} of {{ t.total }}. <a href="{{ url_for('feed') }}">Browse everything in the feed</a>.</div>{% endif %}
+  </section>
+
+  <aside class="mx-side">
+    <section class="mx-box mx-pad" aria-label="Severity mix">
+      <h2 class="mx-h">severity mix, last {{ t.queue_days }} days</h2>
+      {% set m = t.mix %}{% set tot = t.total %}
+      <div class="mx-bar" role="img" aria-label="{{ m.Critical }} critical, {{ m.High }} high, {{ m.Medium }} medium, {{ m.Low }} low, {{ m.Unrated }} unrated">
+        {{ bar(m.Critical, tot, '#EF4444') }}{{ bar(m.High, tot, '#F59E0B') }}{{ bar(m.Medium, tot, '#E5E7EB') }}{{ bar(m.Low, tot, '#2DB58A') }}{{ bar(m.Unrated, tot, '#3A3D55') }}
+      </div>
+      <div class="mx-legend">
+        <span><span style="color:#EF4444">■</span> critical <b>{{ m.Critical }}</b></span>
+        <span><span style="color:#F59E0B">■</span> high <b>{{ m.High }}</b></span>
+        <span><span style="color:#E5E7EB">■</span> medium <b>{{ m.Medium }}</b></span>
+        <span><span style="color:#2DB58A">■</span> low <b>{{ m.Low }}</b></span>
+        <span><span style="color:#6B7280">■</span> unrated <b>{{ m.Unrated }}</b></span>
+      </div>
+      {% if tot and m.Unrated * 3 >= tot %}<div class="sub">Many CVEs have no score yet. Unrated means unknown, not safe.</div>{% endif %}
+    </section>
+    <section class="mx-box mx-pad" aria-label="Sources disagree">
+      <h2 class="mx-h">sources disagree</h2>
+      {% for d in t.disagreements %}
+      <div style="display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--line2);padding-top:10px"><a href="{{ url_for('cve_page', cve_id=d.cve_id) }}">{{ d.cve_id }}</a><span class="tone-wait">{{ d.conflict|join(' vs ') }}</span></div>
+      {% else %}<span class="sub">No disagreements right now.</span>{% endfor %}
+    </section>
+  </aside>
+</div>
+{% endblock %}

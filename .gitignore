@@ -1,0 +1,18 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Runtime data: scraped articles, backups and logs stay on your machine
+*.db
+*.db.bak
+*.bak
+logs/
+
+# The launch-video work (plan, composition, render, music) stays local
+brag-output/
+
+# Editor and OS
+.DS_Store
+Thumbs.db

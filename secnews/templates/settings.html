@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Automation settings{% endblock %}
+{% block body %}
+<form method="post" action="{{ url_for('settings_save') }}" style="display:flex;flex-direction:column;gap:20px">
+<input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<div class="head">
+  <div><h1>Automation settings</h1><div class="sub">Controls what runs, when, and who gets told. Saved to config.yaml.</div></div>
+  <div class="row">
+    <button class="primary" type="submit">Save settings</button>
+    <button type="submit" class="outline" formaction="{{ url_for('scrape_now') }}">Run scrape now</button>
+  </div>
+</div>
+
+<div class="card" style="padding:20px">
+  <h2>Scheduler</h2>
+  <label class="check"><input type="checkbox" name="scheduler_enabled" {{ 'checked' if conf.scheduler.enabled }}>
+    Scheduler enabled. When off, nothing runs automatically, including alerts.</label>
+  {% if not has_scheduler %}<div class="sub">The scheduler runs inside <span class="mono">secnews serve</span> or <span class="mono">secnews schedule</span>. It is not running in this process.</div>{% endif %}
+  <div class="fields">
+    <label class="f">Scrape every
+      <select name="interval_minutes">
+        {% for m, lab in [(15,'15 minutes'),(30,'30 minutes'),(60,'1 hour'),(240,'4 hours'),(1440,'24 hours')] %}
+        <option value="{{ m }}" {{ 'selected' if conf.scheduler.interval_minutes == m }}>{{ lab }}</option>{% endfor %}
+        {% if conf.scheduler.interval_minutes not in [15,30,60,240,1440] %}<option value="{{ conf.scheduler.interval_minutes }}" selected>{{ conf.scheduler.interval_minutes }} minutes</option>{% endif %}
+      </select></label>
+    <label class="f">Quiet hours start (no alerts)<input type="time" name="quiet_start" value="{{ conf.scheduler.quiet_hours.start }}"></label>
+    <label class="f">Quiet hours end<input type="time" name="quiet_end" value="{{ conf.scheduler.quiet_hours.end }}"></label>
+  </div>
+  <div class="mono sub">{% if next_run %}Next run: {{ next_run.strftime('%Y-%m-%d %H:%M UTC') }}{% elif conf.scheduler.enabled %}Next run: starts when the scheduler process runs{% else %}Paused. No scrapes or alerts will run.{% endif %}</div>
+</div>
+
+<div class="cols">
+  <div class="card half" style="padding:20px"><h2>Sources</h2>
+    {% for s in conf.sources %}
+    <div class="kv"><div><div style="font-weight:500">{{ s.name }}</div>
+      <div class="mono sub" style="font-size:12px">{{ 'RSS' if s.feed else 'HTML' }} · {{ health[s.name].status }}{% if health[s.name].when %} {{ health[s.name].when|short }}{% endif %}</div></div>
+      <label class="check"><input type="checkbox" name="source" value="{{ s.name }}" {{ 'checked' if s.enabled is not defined or s.enabled }} aria-label="{{ s.name }} enabled"> On</label></div>
+    {% endfor %}
+  </div>
+  <div class="card half" style="padding:20px"><h2>Alert rules</h2>
+    {% for r in conf.alert_rules %}
+    <div class="kv"><div><div style="font-weight:500">{{ r.name }}</div>
+      <div class="mono sub" style="font-size:12px">{% if r.min_cvss %}cvss ≥ {{ r.min_cvss }} {% endif %}{% if r.keywords %}keywords: {{ r.keywords|join(', ') }} {% endif %}→ {{ r.channels|join(', ') }}</div></div>
+      <label class="check"><input type="checkbox" name="rule" value="{{ r.name }}" {{ 'checked' if r.enabled is not defined or r.enabled }} aria-label="{{ r.name }} enabled"> On</label></div>
+    {% endfor %}
+    <a class="btn outline" href="{{ url_for('rule_new') }}">Add rule</a>
+  </div>
+</div>
+
+<div class="card" style="padding:20px">
+  <div><h2>Channels</h2><div class="sub">Secrets are never stored here. Enter the name of the environment variable that holds each one.</div></div>
+  <div class="fields">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <label class="f">Email: SMTP host<input type="text" name="smtp_host" value="{{ conf.channels.email.smtp_host or '' }}"></label>
+      <label class="f">Email: recipient<input type="text" name="email_to" value="{{ conf.channels.email.to or '' }}"></label>
+      <label class="f">SMTP password variable<input type="text" class="mono" name="smtp_password_env" value="{{ conf.channels.email.password_env or '' }}"></label>
+      <button type="submit" formaction="{{ url_for('test_channel', channel='email') }}">Send test email</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <label class="f">Slack: webhook variable<input type="text" class="mono" name="slack_env" value="{{ conf.channels.slack.webhook_env or '' }}"></label>
+      <button type="submit" formaction="{{ url_for('test_channel', channel='slack') }}">Send test message</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <label class="f">Generic webhook: URL variable<input type="text" class="mono" name="webhook_env" value="{{ conf.channels.webhook.url_env or '' }}"></label>
+      <button type="submit" formaction="{{ url_for('test_channel', channel='webhook') }}">Send test message</button>
+    </div>
+  </div>
+  <div class="sub">Test buttons use the saved settings. Save first if you changed a field.</div>
+</div>
+
+<div class="card" style="padding:20px">
+  <div><h2>Polite fetching</h2><div class="sub">Respecting robots.txt is always on.</div></div>
+  <div class="fields">
+    <label class="f">Seconds between requests per host<input type="number" name="seconds_between_requests" value="{{ conf.fetching.seconds_between_requests }}" min="1" step="1"></label>
+    <label class="f">Request timeout (seconds)<input type="number" name="timeout_seconds" value="{{ conf.fetching.timeout_seconds }}" min="1"></label>
+    <label class="f">Retries with backoff<input type="number" name="retries" value="{{ conf.fetching.retries }}" min="0" max="10"></label>
+    <label class="f">User-Agent<input type="text" class="mono" name="user_agent" value="{{ conf.fetching.user_agent }}"></label>
+  </div>
+</div>
+<div class="row" style="justify-content:flex-end"><button class="primary" type="submit">Save settings</button></div>
+</form>
+{% endblock %}

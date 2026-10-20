@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Threat Feed{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="{{ theme|default('') }}">
+<div class="wrap">
+<nav class="main" aria-label="Main">
+  <a href="{{ url_for('triage_page') }}" class="{{ 'on' if nav == 'triage' }}">Triage</a>
+  <a href="{{ url_for('feed') }}" class="{{ 'on' if nav == 'feed' }}">Feed</a>
+  <a href="{{ url_for('exposure_page') }}" class="{{ 'on' if nav == 'exposure' }}">My exposure</a>
+  <a href="{{ url_for('briefing_page') }}" class="{{ 'on' if nav == 'briefing' }}">Briefing</a>
+  <a href="{{ url_for('pipeline_page') }}" class="{{ 'on' if nav == 'pipeline' }}">Pipeline</a>
+  <a href="{{ url_for('runs') }}" class="{{ 'on' if nav == 'runs' }}">Run log</a>
+  <a href="{{ url_for('rule_new') }}" class="{{ 'on' if nav == 'rules' }}">Alert rules</a>
+  <a href="{{ url_for('settings') }}" class="{{ 'on' if nav == 'settings' }}">Settings</a>
+</nav>
+{% with msgs = get_flashed_messages(with_categories=true) %}
+  {% for cat, m in msgs %}<div class="flash {{ cat }}" role="status">{{ m }}</div>{% endfor %}
+{% endwith %}
+{% block body %}{% endblock %}
+</div>
+</body>
+</html>

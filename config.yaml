@@ -1,0 +1,65 @@
+# secnews configuration. Secrets are never stored here: give the NAME of an
+# environment variable and secnews reads the value at run time.
+
+database: secnews.db
+
+scheduler:
+  enabled: true
+  interval_minutes: 60
+  quiet_hours: {start: "22:00", end: "07:00"}   # no alerts in this window
+
+fetching:
+  user_agent: "secnews/0.1 (contact: you@example.com)"
+  seconds_between_requests: 1
+  timeout_seconds: 15
+  retries: 3
+
+sources:
+  - name: Krebs on Security
+    feed: https://krebsonsecurity.com/feed/
+    enabled: true
+  - name: The Hacker News
+    feed: https://feeds.feedburner.com/TheHackersNews
+    enabled: true
+  - name: BleepingComputer
+    feed: https://www.bleepingcomputer.com/feed/
+    enabled: true
+  # SecurityWeek sits behind a Cloudflare bot challenge (HTTP 403 for automated
+  # clients, even robots.txt). Re-enable only if they grant access.
+  - name: SecurityWeek
+    feed: https://www.securityweek.com/feed/
+    enabled: false
+  - name: CISA Advisories
+    feed: https://www.cisa.gov/cybersecurity-advisories/all.xml
+    kind: Vendor advisory      # primary source: always labelled as an advisory
+    enabled: true
+  - name: Dark Reading
+    feed: https://www.darkreading.com/rss.xml
+    enabled: true
+
+channels:
+  slack:   {webhook_env: SECNEWS_SLACK_WEBHOOK}
+  webhook: {url_env: SECNEWS_WEBHOOK_URL}
+  email:
+    smtp_host: smtp.example.com
+    smtp_port: 587
+    username: you@example.com
+    password_env: SECNEWS_SMTP_PASSWORD
+    to: you@example.com
+
+alert_rules:
+  # Rules ship disabled: set a channel's environment variable, run
+  # "python -m secnews alerts-test slack", then enable the rule.
+  - name: Critical anywhere
+    enabled: false
+    min_cvss: 9.0
+    channels: [slack]
+  - name: Software watchlist
+    enabled: false
+    keywords: [exchange, fortinet, openssl]
+    channels: [email]
+  - name: High severity webhook
+    enabled: false
+    min_cvss: 7.0
+    channels: [webhook]
+    realert_on_change: true

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}New alert rule{% endblock %}
+{% block body %}
+<a href="{{ url_for('settings') }}" style="display:inline-flex;align-items:center;min-height:44px">← Back to automation settings</a>
+<div><h1>New alert rule</h1><div class="sub">A rule fires once per CVE when every condition you set matches.</div></div>
+
+<form method="post" action="{{ url_for('rule_new') }}" class="cols">
+<input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<div class="half" style="display:flex;flex-direction:column;gap:16px">
+  <div class="card" style="padding:20px"><h2>1. Name</h2>
+    <label class="f">Rule name<input type="text" name="name" value="{{ rule.name or '' }}" placeholder="Critical in my stack"></label></div>
+
+  <div class="card" style="padding:20px"><h2>2. Conditions</h2>
+    <label class="f">Keywords or software names, comma separated (matches title, summary and affected software)
+      <input type="text" class="mono" name="keywords" value="{{ (rule.keywords or [])|join(', ') or request.args.get('keywords','') }}" placeholder="exchange, fortinet, openssl"></label>
+    <label class="f">Minimum CVSS (0 = no minimum)
+      <input type="number" name="min_cvss" min="0" max="10" step="0.5" value="{{ rule.min_cvss or 0 }}"></label>
+    <div><div class="sub" style="margin-bottom:6px">Sources (none ticked = all)</div>
+      <div class="row">{% for s in sources %}<label class="check"><input type="checkbox" name="source" value="{{ s }}" {{ 'checked' if s in (rule.sources or []) }}> {{ s }}</label>{% endfor %}</div></div>
+    <div><div class="sub" style="margin-bottom:6px">Articles with no CVSS score found</div>
+      <label class="check"><input type="radio" name="unrated" value="skip" {{ 'checked' if rule.unrated != 'alert' }}> Skip</label>
+      <label class="check"><input type="radio" name="unrated" value="alert" {{ 'checked' if rule.unrated == 'alert' }}> Alert anyway</label></div>
+  </div>
+
+  <div class="card" style="padding:20px"><h2>3. Deliver to</h2>
+    <div class="row">{% for c in channels %}<label class="check"><input type="checkbox" name="channel" value="{{ c }}" {{ 'checked' if c in (rule.channels or []) }}> {{ c|title }}</label>{% endfor %}</div>
+    <div class="sub">Each rule alerts once per CVE, even when several sources cover it.</div>
+    <label class="check"><input type="checkbox" name="realert" {{ 'checked' if rule.realert_on_change }}> Alert again if the CVSS score rises or exploitation is first reported</label>
+  </div>
+  <div class="row" style="justify-content:flex-end">
+    <a class="btn" href="{{ url_for('settings') }}">Cancel</a>
+    <button type="submit" name="action" value="test">Test rule</button>
+    <button type="submit" name="action" value="save" class="primary">Save rule</button>
+  </div>
+</div>
+
+<div class="half card" style="padding:20px">
+  <h2>Test against stored articles</h2>
+  <p class="sub" style="margin:0">Shows what this rule would catch from the last 7 days. Nothing is sent.</p>
+  {% if tested %}
+    <strong>{{ match_count }} match{{ '' if match_count == 1 else 'es' }}{% if match_count > 10 %} (showing 10){% endif %}</strong>
+    {% for d in matches %}
+    <div style="padding-bottom:10px;border-bottom:1px solid var(--line2)">
+      <a href="{{ url_for('cve_page', cve_id=d.cve_id) }}" style="font-weight:500">{{ d.articles[0].title }}</a>
+      <div class="mono sub" style="font-size:12px">{{ d.cve_id }} · {{ d.severity }}{% if d.cvss is not none %} · CVSS {{ d.cvss }}{% endif %} · {{ d.source_count }} source(s)</div>
+    </div>
+    {% else %}<div class="sub">No stored article matches. Loosen a condition.</div>{% endfor %}
+  {% else %}<div class="sub">Set conditions and press “Test rule”.</div>{% endif %}
+</div>
+</form>
+{% endblock %}

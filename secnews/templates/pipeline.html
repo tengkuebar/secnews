@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Pipeline health{% endblock %}
+{% block body %}
+<div class="head">
+  <div><h1 style="font-size:20px">pipeline<span style="color:#4FD1A5">_</span></h1>
+    <div class="sub">Can you trust what the other pages show? Fetching, freshness and alert delivery.</div></div>
+  <form method="post" action="{{ url_for('scrape_now') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('pipeline_page') }}">
+    <button class="primary" style="color:#04130D;font-family:inherit;font-weight:700;border-radius:2px">scrape now</button>
+  </form>
+</div>
+
+<section aria-label="Health summary" class="mx-kpis">
+  <div class="mx-kpi"><span class="l">sources healthy</span>
+    <span class="v {{ 'tone-ok' if p.kpis.healthy == p.kpis.active else 'tone-wait' }}">{{ p.kpis.healthy }} / {{ p.kpis.active }}</span>
+    <span class="d">Sources that are switched on and whose last run succeeded</span></div>
+  <div class="mx-kpi"><span class="l">failed runs, 24h</span>
+    <span class="v {{ 'tone-bad' if p.kpis.failed_24h else 'tone-ok' }}">{{ p.kpis.failed_24h }}</span>
+    <span class="d">Scrapes that returned an error</span></div>
+  <div class="mx-kpi"><span class="l">newest article</span><span class="v">{{ p.kpis.newest_age }}</span>
+    <span class="d">Age of the most recent item stored</span></div>
+  <div class="mx-kpi"><span class="l">alerts not delivered, {{ p.alert_days }}d</span>
+    <span class="v {{ 'tone-bad' if p.kpis.undelivered else 'tone-ok' }}">{{ p.kpis.undelivered }}</span>
+    <span class="d">A channel returned an error when sending</span></div>
+</section>
+
+<section aria-label="Sources" class="mx-main" style="flex:none">
+  <h2 class="mx-h">sources, last 24 runs each, oldest on the left</h2>
+  <div class="mx-box">
+    <div class="px-row mx-head" style="border-top:0"><span>source</span><span>status</span><span>runs</span><span>fetched</span><span>new 24h</span><span>newest</span></div>
+    {% for s in p.sources %}
+    {% set ok = s.cells|select('equalto','OK')|list|length %}{% set pa = s.cells|select('equalto','Partial')|list|length %}{% set fa = s.cells|select('equalto','Failed')|list|length %}
+    <div class="px-row">
+      <span style="font-weight:700">{{ s.name }}</span>
+      <span class="tone-{{ s.tone }}" style="font-weight:700">{{ s.status }}</span>
+      <span class="sqs" role="img" aria-label="{{ ok }} ok, {{ pa }} partial, {{ fa }} failed in the last {{ s.cells|length }} runs">
+        {% for c in s.cells %}<span class="sq sq-{{ c }}"></span>{% else %}<span class="sub">no runs</span>{% endfor %}
+      </span>
+      <span>{{ s.fetched }}</span><span>{{ s.new_24h }}</span><span class="sub" style="margin:0">{{ s.newest_age }}</span>
+      {% if s.error %}<span class="tone-bad" style="grid-column:1/-1;font-size:14px;overflow-wrap:anywhere">{{ s.error }}</span>{% endif %}
+      {% if s.off_reason %}<span class="sub" style="grid-column:1/-1;margin:0;overflow-wrap:anywhere">Turned off. Its last run failed: {{ s.off_reason }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <div class="mx-legend" style="grid-template-columns:repeat(auto-fit,minmax(110px,max-content));gap:6px 24px;font-size:14px;color:var(--muted)">
+    <span><span style="color:#2DB58A">■</span> ok</span><span><span style="color:#F59E0B">■</span> partial</span><span><span style="color:#EF4444">■</span> failed</span>
+  </div>
+</section>
+
+<div class="mx-cols">
+  <section class="mx-main" style="flex:1 1 480px" aria-label="Who reports first">
+    <h2 class="mx-h">who reports first, last {{ p.first_days }} days</h2>
+    <div class="mx-box mx-pad">
+      {% for name, n in p.first %}
+      <div style="display:grid;grid-template-columns:170px 1fr 44px;gap:14px;align-items:center">
+        <span>{{ name }}</span>
+        <span style="height:14px;background:var(--line2);border-radius:2px"><span style="display:block;height:14px;width:{{ (n * 100 / p.first_max)|round(1) }}%;background:#2DB58A;border-radius:2px"></span></span>
+        <span style="text-align:right;font-weight:700">{{ n }}</span>
+      </div>
+      {% else %}<span class="sub">Not enough data. This needs CVEs that two or more sources have covered.</span>{% endfor %}
+      <span class="sub">Counts CVEs covered by two or more sources, by whose article was published first. Tells you which feed to trust for speed.</span>
+    </div>
+  </section>
+  <section class="mx-main" style="flex:1 1 380px" aria-label="Alert delivery">
+    <h2 class="mx-h">alert delivery, last {{ p.alert_days }} days</h2>
+    <div class="mx-box mx-pad">
+      {% for ch, c in p.channels.items() %}
+      <div style="display:grid;grid-template-columns:110px 1fr 90px;gap:14px;align-items:center;border-top:1px solid var(--line2);padding-top:10px">
+        <span>{{ ch }}</span>
+        <span class="sub" style="margin:0">{{ c.sent }} sent{% if c.failed %}, {{ c.failed }} not delivered{% endif %}</span>
+        <span style="text-align:right;font-weight:700" class="{{ 'tone-bad' if c.failed and not c.sent else ('tone-wait' if c.failed else 'tone-ok') }}">{{ 'failing' if c.failed and not c.sent else ('check' if c.failed else 'ok') }}</span>
+      </div>
+      {% else %}<span class="sub">No alerts have been sent or attempted in this period.</span>{% endfor %}
+      <a href="{{ url_for('settings') }}">open channel settings</a>
+    </div>
+  </section>
+</div>
+{% endblock %}

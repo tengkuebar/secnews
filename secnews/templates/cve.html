@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ d.cve_id }}{% endblock %}
+{% block body %}
+<a href="{{ url_for('feed') }}" style="display:inline-flex;align-items:center;min-height:44px">← Back to feed</a>
+
+<div class="card" style="padding:24px;flex-direction:row;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:24px">
+  <div style="display:flex;flex-direction:column;gap:10px;min-width:0;flex:1 1 480px">
+    <div class="row" style="gap:12px">
+      <h1 class="mono" style="font-size:28px;font-weight:500">{{ d.cve_id }}</h1>
+      <span class="badge sev-{{ d.severity }}">{{ d.severity }}</span>
+    </div>
+    <p class="sub" style="margin:0;font-size:15px;max-width:70ch">{{ d.articles[0].summary or d.articles[0].title }}</p>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+    <span class="score">{{ d.cvss if d.cvss is not none else '—' }}</span>
+    <span class="sub" style="font-size:12px">{% if d.score_source %}CVSS, from {{ d.score_source }}{% else %}No score published{% endif %}</span>
+  </div>
+</div>
+
+{% if d.conflict %}
+<div class="note"><strong>Sources disagree on the score: {{ d.conflict|join(' vs ') }}</strong><br>
+Showing {{ d.score_source }}. Each article below lists the score it quoted.</div>
+{% endif %}
+
+<div class="grid4">
+  <div class="card"><span class="sub">Affected software</span><span style="font-size:15px;font-weight:500">{{ d.affected or 'Not stated' }}</span></div>
+  <div class="card"><span class="sub">First seen</span><span class="mono" style="font-size:15px;font-weight:500">{{ d.first_seen|short }}</span></div>
+  <div class="card"><span class="sub">Mentioned in</span><span style="font-size:15px;font-weight:500">{{ d.article_count }} article{{ '' if d.article_count == 1 else 's' }} across {{ d.source_count }} source{{ '' if d.source_count == 1 else 's' }}</span></div>
+  <div class="card"><span class="sub">Exploitation status</span><span style="font-size:15px;font-weight:500">{{ 'Reported by news' if d.exploited else 'Not reported' }}</span></div>
+</div>
+
+<div class="cols">
+  <div class="main-col card flush">
+    <div class="listhead"><h2 style="color:var(--ink)">Articles mentioning this CVE</h2></div>
+    {% for a in d.articles %}
+    <div style="display:flex;flex-direction:column;gap:6px;padding:14px 16px;border-bottom:1px solid var(--line2)">
+      <div class="head" style="align-items:flex-start;gap:8px">
+        <a class="item t" style="padding:0;border:0;color:var(--ink);text-decoration:none;font-size:15px;font-weight:500" href="{{ a.url }}" rel="noopener noreferrer" target="_blank">{{ a.title }}</a>
+        <span class="chipcve" style="font-family:inherit">{{ a.kind }}</span>
+      </div>
+      {% if a.summary %}<div class="sub">{{ a.summary|excerpt(240) }}</div>{% endif %}
+      <div class="sub" style="font-size:12px">{{ a.source }} · quoted CVSS {{ a.cvss if a.cvss is not none else 'none' }} · {{ a.when_[:10] }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="side-col">
+    <div class="card"><h2>Alerts sent</h2>
+      {% for al in d.alerts %}<div style="padding-bottom:10px;border-bottom:1px solid var(--line2)"><div style="font-weight:500">{{ al.rule }}</div><div class="mono sub" style="font-size:12px">{{ al.sent_at|short }}</div></div>
+      {% else %}<span class="sub">No alerts sent for this CVE.</span>{% endfor %}
+      {% if d.alerts %}<span class="sub" style="font-size:12px">One alert per rule, however many articles cover the CVE.</span>{% endif %}
+    </div>
+    <div class="note"><strong style="font-size:14px">How to read the source labels</strong>
+      <p style="margin:6px 0 0;font-size:13px;line-height:1.5">Vendor advisory is a primary source. News report and researcher write-up are secondary, and the severity they quote can differ from the official score. Labels are guessed from the headline, so check the primary source before acting.</p></div>
+    <div class="card"><h2>Actions</h2>
+      <a class="btn primary" href="{{ url_for('rule_new', keywords=d.affected or '') }}">Create alert rule for this software</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

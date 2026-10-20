@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<channel>
+<title>Fixture A</title>
+<item>
+<title>Critical flaw in Acme Gateway exploited in the wild</title>
+<link>https://a.example/acme-gateway</link>
+<pubDate>Mon, 05 Oct 2026 10:00:00 GMT</pubDate>
+<description><![CDATA[<p>CVE-2026-0001 has a CVSS score of 9.8 and affects Acme Gateway 4.x. It is being exploited.</p>]]></description>
+</item>
+<item>
+<title>Two bugs patched in Widget Server</title>
+<link>https://a.example/widget</link>
+<pubDate>Tue, 06 Oct 2026 08:30:00 GMT</pubDate>
+<description><![CDATA[<p>CVE-2026-0002 is rated CVSS 5.3 and leaks data. Separately, cve-2026-0003 is a denial of service with no score published.</p>]]></description>
+</item>
+<item>
+<title>Weekly roundup with no vulnerabilities</title>
+<link>https://a.example/roundup</link>
+<pubDate>Wed, 07 Oct 2026 08:30:00 GMT</pubDate>
+<description>Nothing to see here.</description>
+</item>
+</channel>
+</rss>
